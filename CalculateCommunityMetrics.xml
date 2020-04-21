@@ -1,0 +1,58 @@
+<tool id="pampa_communitymetrics" name="Calculate community metrics" version="@VERSION@">
+    <description>calculate community metrics from abundance data</description>
+    <macros>
+        <import>pampa_macros.xml</import>
+    </macros>
+    <expand macro="NestComm_requirements"/>
+    <command detect_errors="exit_code"><![CDATA[
+        Rscript 
+         '$__tool_directory__/FunctExeCalcCommIndexesGalaxy.r' 
+         '$input'
+         'all'
+         '$__tool_directory__/FunctPAMPAGalaxy.r' 
+         '$output_presabs'
+         '$output_community'
+    ]]>
+    </command>
+    <inputs>
+        <param name="input" type="data" format="tabular" label="Input file" help="Observation data file, with location, year, species and abundance."/>
+    </inputs>
+    <outputs>
+        <data name="output_presabs" from_work_dir="TabPresAbs.tabular" format="tabular"/>
+        <data name="output_community" from_work_dir="TabCommunityIndexes.tabular" format="tabular"/>
+    </outputs>
+    <tests>
+        <test> 
+            
+        </test>
+    </tests>
+    <help><![CDATA[
+===============================
+STOC preprocess population data
+===============================
+
+**What it does**
+
+
+
+
+|
+
+**Input description**
+
+
+
+|
+
+**Output**
+
+
+|
+
+**Source**
+
+
+  ]]></help>
+
+  <expand macro="pampa_bibref" />
+</tool>
