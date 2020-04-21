@@ -8,7 +8,8 @@
         Rscript 
          '$__tool_directory__/FunctExeCalcCommIndexesGalaxy.r' 
          '$input'
-         'all'
+         '$indexes'
+         '$obs_type'
          '$__tool_directory__/FunctPAMPAGalaxy.r' 
          '$output_presabs'
          '$output_community'
@@ -16,6 +17,16 @@
     </command>
     <inputs>
         <param name="input" type="data" format="tabular" label="Input file" help="Observation data file, with location, year, species and abundance."/>
+        <param name="obs_type" type="select" label="Choose the observation type of your data table" help="Abundance from STAVIRO data is calculated differently">
+            <option selected="true" value="other">Other</option>
+            <option value="SVR">SVR</option>
+        </param>
+        <param name="indexes" type="select" label="Choose the community metrics you want to compute" help="Presence/absence, Species richness and Simpson index are systematically computed." multiple="true">
+            <option selected="true" value="all">All</option>
+            <option value="simpson.l">1-Simpson</option>
+            <option value="pielou">Pielou</option>
+            <option value="hill">Hill</option>
+        </param>
     </inputs>
     <outputs>
         <data name="output_presabs" from_work_dir="TabPresAbs.tabular" format="tabular"/>

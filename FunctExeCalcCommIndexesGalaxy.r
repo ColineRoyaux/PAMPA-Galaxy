@@ -20,18 +20,21 @@ if (length(args) < 5) {
 } else {
     Importdata<-args[1] ###### Nom du fichier importé avec son extension / file name imported with the file type ".filetype"  
     index <- args[2] ###### List of selected metrics to calculate
-    source(args[3])  
+    ObsType <- args[3] ###### Observation type of the data table
+    source(args[4]) ###### Import functions
 
 }
-#### Data must be a dataframe with 4 variables : tracks abundance ("number"), unitobs representing location and year ("unitobs"), species code ("species.code") and clutch count ("ponte")
+#### Data must be a dataframe with at least 3 variables : unitobs representing location and year ("observation.unit"), species code ("species.code") and abundance ("number")
 
 
 #Import des données / Import data 
 obs<- read.table(Importdata,sep="\t",dec=".",header=TRUE,encoding="UTF-8") #
 obs[obs == -999] <- NA 
-#vars_data<-c("carre","annee","espece","abond")
-#err_msg_data<-"The input dataset filtered doesn't have the right format. It need to have the following 4 variables :\n- carre\n- annee\n- espece\n- abond\n"
-#check_file(data,err_msg_data,vars_data,4)
+factors <- fact.det.f(Obs=obs)
+
+vars_data<-c("observation.unit","species.code","number")
+err_msg_data<-"The input dataset doesn't have the right format. It need to have at least the following 3 variables :\n- observation.unit\n- species.code\n- number\n"
+check_file(obs,err_msg_data,vars_data,3)
 
 
 ####################################################################################################
@@ -215,7 +218,7 @@ calcBiodiv.f <- function(Data,
 
 ################# Analysis
 
-res <- calc.numbers.f(obs, factors=c("observation.unit", "species.code", "size.class"), nbName="number")
+res <- calc.numbers.f(obs, ObsType=ObsType , factors=factors, nbName="number")
 res$pres.abs <- calc.presAbs.f(res, nbName="number")
 
 tableCommunityIndexes <- calcBiodiv.f(res, #refesp, 

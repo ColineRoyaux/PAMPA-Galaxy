@@ -1,0 +1,37 @@
+<macros>
+    <token name="@VERSION@">0.0.1</token>
+    <xml name="NestComm_requirements">
+        <requirements>
+            <requirement type="package" version="1.12.0">r-data.table</requirement>
+        </requirements>    
+    </xml>
+    <xml name="pampa_input_????">
+        <param name="input" type="data" format="tabular" label="?????? input" help="????????" />
+    </xml>
+    <xml name="pampa_advanced_params_select">
+        <param name="advanced" type="select" label="Specify advanced parameters">
+            <option value="simple" selected="true">No, use program defaults.</option>
+            <option value="advanced">Yes, see full parameter list.</option>
+        </param>        
+        <when value="simple">
+        </when>        
+    </xml>
+    <xml name="pampa_compute_????">
+        <param name="compute_???" type="boolean" truevalue="TRUE" falsevalue="FALSE" checked="yes" label="Compute ?????"/>
+    </xml>
+    <xml name="pampa_filter_????">
+        <filter> settings['advanced'] == 'advanced'</filter>
+        <filter> settings['method'] == '????'</filter>
+    </xml>
+    <xml name="pampa_bibref">
+        <citations>
+            <citation type="bibtex">
+	    @unpublished{????,
+	    title={ PAMPA "ressources et biodiversité" scripts },
+            author={Yves Reecht},
+            url={??????}
+            }
+            </citation>
+        </citations>
+    </xml>
+</macros>
