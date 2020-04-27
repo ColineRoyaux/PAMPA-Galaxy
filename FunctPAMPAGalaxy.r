@@ -18,7 +18,7 @@
 #suppressMessages(library(data.table))  version 1.12.0
 #suppressMessages(library(reshape2))   version 1.4.3
 
-######################################### start of the function fact.def.f 
+######################################### start of the function fact.def.f called by FunctExeCalcCommIndexesGalaxy.r
 ####### Define the finest aggregation with the observation table
 
 fact.det.f <- function (Obs,
@@ -37,7 +37,7 @@ fact.det.f <- function (Obs,
 
 ######################################### end of the function fact.def.f 
 
-######################################### start of the function check_file
+######################################### start of the function check_file called by every Galaxy Rscripts
 
 # Fonction pour verifier les données d'entrée / General function to check integrity of input file. Will check numbers and contents of variables(colnames). 
 #return an error message and exit if mismatch detected
@@ -59,7 +59,7 @@ check_file<-function(dataset,err_msg,vars,nb_vars){
 ######################################### end of the function check_file
 
 
-######################################### start of the function statRotationsNumber.f 
+######################################### start of the function statRotationsNumber.f called by calc.numbers.f
 
 statRotationsNumber.f <- function(factors, obs)
 {
@@ -130,7 +130,7 @@ statRotationsNumber.f <- function(factors, obs)
 
 ######################################### end of the function statRotationsNumber.f 
 
-######################################### start of the function calcNumber.default.f
+######################################### start of the function calcNumber.default.f called by calc.numbers.f
 ## Calcul des nombres au niveau d'agrégation le plus fin.
 
 calcNumber.default.f <- function(obs,
@@ -216,7 +216,7 @@ calc.numbers.f <- function(obs, ObsType="", factors=c("observation.unit", "speci
 
 ######################################### end of the function calc.numbers.f
 
-######################################### start of the function presAbs.f
+######################################### start of the function presAbs.f called by calcBiodiv.f
 
 presAbs.f <- function(nombres, logical=FALSE)
 {
@@ -244,7 +244,7 @@ presAbs.f <- function(nombres, logical=FALSE)
 
 ######################################### end of the function presAbs.f
 
-######################################### start of the function betterCbind
+######################################### start of the function betterCbind called by agregations.generic.f
 
 betterCbind <- function(..., dfList=NULL, deparse.level = 1)
 {
@@ -281,7 +281,7 @@ betterCbind <- function(..., dfList=NULL, deparse.level = 1)
 
 ######################################### end of the function betterCbind
 
-######################################### start of the function agregation.f
+######################################### start of the function agregation.f called by agregations.generic.f
 
 agregation.f <- function(metric, Data, factors, casMetrique, dataEnv,
                          nbName="number")
@@ -490,7 +490,7 @@ agregation.f <- function(metric, Data, factors, casMetrique, dataEnv,
 
 ######################################### end of the function agregation.f
 
-######################################### start of the function agregations.generic.f
+######################################### start of the function agregations.generic.f called y calcBiodiv.f in FucntExeCalcCommIndexesGalaxy.r
 
 agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpSz=NULL, unitSp=NULL, info=FALSE,
                                   dataEnv=.GlobalEnv, nbName="number")
@@ -705,7 +705,7 @@ agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpS
 
 ######################################### end of the function agregations.generic.f
 
-######################################### start of the function dropLevels.f
+######################################### start of the function dropLevels.f called y calcBiodiv.f in FucntExeCalcCommIndexesGalaxy.r
 dropLevels.f <- function(df, which=NULL)
 {
     ## Purpose: Supprimer les 'levels' non utilisés des factors d'une
@@ -742,3 +742,393 @@ dropLevels.f <- function(df, which=NULL)
     }
 }
 ######################################### end of the function dropLevels.f
+
+######################################### start of the function subsetToutesTables.f called by modeleLineaireWP2.unitobs.f in FunctExeCalcGLMGalaxy.r
+
+subsetToutesTables.f <- function(metrique, tabMetrics, facteurs, selections,
+                                 tabUnitobs, refesp, tableMetrique="", nbName="number", ObsType = "",
+                                 exclude=NULL, add=c("species.code", "observation.unit"))
+{
+    ## Purpose: Extraire les données utiles uniquement, d'après les métrique
+    ##          et facteur(s) séléctionnés, ainsi que leur(s) sélection(s) de
+    ##          modalité(s).
+    ## ----------------------------------------------------------------------
+    ## Arguments: metrique : la métrique choisie.
+    ##            facteurs : les facteurs sélectionnés (tous)
+    ##            selections : les sélections de modalités correspondantes
+    ##                         (liste).
+    ##            tableMetrique : le nom de la table des métriques.
+    ##            exclude : niveau de facteur à ne pas prendre en compte pour
+    ##                      le subset.
+    ##            add : champ(s) (de la table de métrique) à ajouter aux
+    ##                  données.
+    ##            dataEnv : l'environnement des données.
+    ## ----------------------------------------------------------------------
+    ## Author: Yves Reecht, Date:  6 août 2010, 16:46
+
+    ## Si pas de table de métrique disponible ou déjà calculée
+    ## ("TableOcurrences" est calculée à partir de la sélection) :
+    if (is.element(tableMetrique, c("", "TableOccurrences", "TablePresAbs")))
+    {
+        tableMetrique <- "unitSp"
+    }else{}
+
+    casTables <- c("unitSp"="unitSp",
+                   "TablePresAbs"="unitSp",
+                   "unitSpSz"="unitSpSz")
+
+    ## Récupération de la table de métriques :
+    dataMetrique <- tabMetrics
+    unitobs <- tabUnitobs
+    refesp <- refesp
+
+    ## Si pas de métrique disponible ou déjà calculée ("freq.occurrence" est calculée à partir de la sélection) :
+    if (is.element(metrique, c("", "occurrence.frequency")))
+    {
+        metrique <- "tmp"
+        dataMetrique$tmp <- 0
+        dataMetrique$tmp[dataMetrique[ , nbName] > 0] <- 1
+    }else{}
+
+    if (!is.null(add))
+    {
+        metriques <- c(metrique, add[is.element(add, colnames(dataMetrique))])
+    }else{
+        metriques <- metrique
+    }
+
+    ## Subset en fonction de la table de métrique
+    switch(casTables[tableMetrique],
+           ## Cas de la table d'observation ou des tables de présence :
+           unitSp={
+                restmp <- cbind(dataMetrique[!is.na(dataMetrique[ , metrique]) , metriques, drop=FALSE],
+                                unitobs[match(dataMetrique$observation.unit[!is.na(dataMetrique[ , metrique])],
+                                              unitobs$observation.unit), # ajout des colonnes sélectionnées d'unitobs
+                                        facteurs[is.element(facteurs, colnames(unitobs))], drop=FALSE],
+                                refesp[match(dataMetrique$species.code[!is.na(dataMetrique[ , metrique])],
+                                             refesp$species.code),        # ajout des colonnes sélectionnées d'especes
+                                       facteurs[is.element(facteurs, colnames(refesp))], drop=FALSE])
+            },
+           ## Cas de la table d'observations par classes de taille :
+           unitSpSz={
+               restmp <- cbind(dataMetrique[!is.na(dataMetrique[ , metrique]) ,
+                                            c(metriques, "size.class"), drop=FALSE],
+                               unitobs[match(dataMetrique$observation.unit[!is.na(dataMetrique[ , metrique])],
+                                             unitobs$observation.unit), # ajout des colonnes sélectionnées d'unitobs
+                                       facteurs[is.element(facteurs, colnames(unitobs))], drop=FALSE],
+                               refesp[match(dataMetrique$species.code[!is.na(dataMetrique[ , metrique])],
+                                            refesp$species.code),        # ajout des colonnes sélectionnées d'especes
+                                      facteurs[is.element(facteurs, colnames(refesp))], drop=FALSE])
+           },
+           ## Autres cas :
+           restmp <- cbind(dataMetrique[!is.na(dataMetrique[ , metrique]) , metriques, drop=FALSE],
+                           unitobs[match(dataMetrique$observation.unit[!is.na(dataMetrique[ , metrique])],
+                                         unitobs$observation.unit), # ajout des colonnes sélectionnées d'unitobs.
+                                   facteurs[is.element(facteurs, colnames(unitobs))], drop=FALSE])
+           )
+
+    selCol <- which(!is.na(selections))
+    if (!is.null(exclude))
+    {
+        selCol <- selCol[selCol != exclude]
+    }
+    for (i in selCol)
+    {
+        restmp <- subset(restmp, is.element(restmp[ , facteurs[i]], selections[[i]]))
+    }
+
+    ## Traitement particulier des classes de taille (mise en facteur avec ordre défini selon le context) :
+    if (is.element("size.class", colnames(restmp)))
+    {
+        if (length(grep("^[[:digit:]]*[-_][[:digit:]]*$", unique(as.character(restmp$size.class)), perl=TRUE)) ==
+            length(unique(as.character(restmp$size.class))))
+        {
+            restmp$size.class <-
+                factor(as.character(restmp$size.class),
+                       levels=unique(as.character(restmp$size.class))[
+                               order(as.numeric(sub("^([[:digit:]]*)[-_][[:digit:]]*$",
+                                                    "\\1",
+                                                    unique(as.character(restmp$size.class)),
+                                                    perl=TRUE)),
+                                     na.last=FALSE)])
+        }else{
+            restmp$size.class <- factor(restmp$size.class)
+        }
+    }else{}
+
+    ## Conversion des biomasses et densités -> /100m² :
+    if (any(is.element(colnames(restmp), c("biomass", "density",
+                                           "biomass.max", "density.max",
+                                           "biomass.sd", "density.sd"))) && ObsType != "fishing")
+    {
+        restmp[ , is.element(colnames(restmp),
+                             c("biomass", "density",
+                               "biomass.max", "density.max",
+                               "biomass.sd", "density.sd"))] <- 100 *
+                                   restmp[, is.element(colnames(restmp),
+                                                       c("biomass", "density",
+                                                         "biomass.max", "density.max",
+                                                         "biomass.sd", "density.sd"))]
+    }else{}
+
+    return(restmp)
+}
+
+######################################### end of the function subsetToutesTables.f
+
+######################################### start of the function calcLM.f called by modeleLineaireWP2.unitobs.f in FunctExeCalcGLMGalaxy.r
+calcLM.f <- function(loiChoisie, formule, metrique, Data)
+{
+    ## Purpose:
+    ## ----------------------------------------------------------------------
+    ## Arguments:
+    ## ----------------------------------------------------------------------
+    ## Author: Yves Reecht, Date: 17 sept. 2010, 14:49
+
+     switch(loiChoisie,
+            ## Modèle linéaire :
+            NO={
+                res <- lm(formule, data=Data)
+            },
+            ## Modèle linéaire, données log-transformées :
+            LOGNO={
+                ## Ajout d'une constante à la métrique si contient des zéros :
+                if (sum(Data[ , metrique] == 0, na.rm=TRUE))
+                {
+                    Data[ , metrique] <- Data[ , metrique] +
+                        ((min(Data[ , metrique], na.rm=TRUE) + 1) / 1000)
+                }else{}
+
+                res <- lm(formule, data=Data)
+            },
+            ## GLM, distribution Gamma :
+            GA={
+                ## Ajout d'une constante à la métrique si contient des zéros :
+                if (sum(Data[ , metrique] == 0, na.rm=TRUE))
+                {
+                    Data[ , metrique] <- Data[ , metrique] +
+                        ((min(Data[ , metrique], na.rm=TRUE) + 1) / 1000)
+                }else{}
+
+                res <- glm(formule, data=Data, family="Gamma")
+            },
+            ## GLM, distribution de Poisson :
+            PO={
+                res <- glm(formule, data=Data, family="poisson")
+            },
+            ## GLM, distribution binomiale négative :
+            NBI={
+                res <- glm.nb(formule, data=Data)
+            },
+            ## GLM, distribution binomiale (présences/absences) :
+            BI={
+                res <- glm(formule, data=Data, family="binomial")
+            },
+            )
+     return(res)
+}
+
+
+
+######################################### end of the function calcLM.f
+
+######################################### start of the function sortiesLM.f called by modeleLineaireWP2.unitobs.f in FunctExeCalcGLMGalaxy.r
+sortiesLM.f <- function(objLM, formule, metrique, factAna, modSel, listFact, listFactSel, Data, dataEnv,
+                        Log=FALSE, sufixe=NULL, type="espece", baseEnv=.GlobalEnv)
+{
+    ## Purpose: Formater les résultats de lm et les écrire dans un fichier
+    ## ----------------------------------------------------------------------
+    ## Arguments: objLM : un objet de classe lm
+    ##            formule : la formule utilisée (pas lisible dans le call).
+    ##            metrique : la métrique choisie.
+    ##            factAna : le facteur de séparation des analyses.
+    ##            modSel : la modalité courante.
+    ##            listFact : liste du (des) facteur(s) de regroupement.
+    ##            Data : les données utilisées.
+    ##            Log : données log-transformées ou non (booléen).
+    ##            sufixe : un sufixe pour le nom de fichier.
+    ##            type : type d'analyse, pour traitement conditionnel des
+    ##                   titres et noms de fichiers.
+    ## ----------------------------------------------------------------------
+    ## Author: Yves Reecht, Date: 25 août 2010, 16:19
+
+
+    ## Ajout d'une constante si des zéros dans la métrique + transformation 'log' :
+    if (sum(Data[ , metrique] == 0, na.rm=TRUE) & Log)
+    {
+        Data[ , metrique] <- Data[ , metrique] +
+            ((min(Data[ , metrique], na.rm=TRUE) + 1) / 1000)
+    }else{}
+
+    ## Formule de modèle lisible:
+    objLM$call$formula <- formule
+    formule <<- formule
+    resLM <<- objLM
+
+    ## Chemin et nom de fichier :
+    resFile <- resFileLM.f(objLM=objLM, metrique=metrique, factAna=factAna, modSel=modSel, listFact=listFact,
+                           dataEnv=dataEnv, Log=Log, sufixe=sufixe, type=type)
+    on.exit(tryCatch(close(resFile), error=function(e){}), add=TRUE)
+
+
+    ## Informations et statistiques globales sur le modèle :
+    infoStatLM.f(objLM=objLM, resFile=resFile)
+
+
+    ## Anova globale du modèle + significativité des coefficients :
+    signifParamLM.f(objLM=objLM, resFile=resFile)
+
+
+    ## ##################################################
+    ## Valeurs prédites par le modèle :
+    valPreditesLM.f(objLM=objLM, Data=Data, listFact=listFact, resFile=resFile)
+
+    ## ##################################################
+    ## Comparaisons multiples :
+
+    ## if (all(is.element(c("year", "protection.status"), listFact)))
+    if (length(listFact) == 2)
+    {
+        WinInfo <- tktoplevel()
+        on.exit(tkdestroy(WinInfo))
+        tkwm.title(WinInfo, mltext("sortiesLM.W.Title"))
+
+        tkgrid(tklabel(WinInfo, text="\t "),
+               tklabel(WinInfo, text=paste0("\n", mltext("sortiesLM.Wminfo.Info.1"), "\n")),
+               tklabel(WinInfo, text="\t "),
+               sticky="w")
+
+        tkgrid(tklabel(WinInfo, text="\t "),
+               tklabel(WinInfo,
+                       text=paste(mltext("sortiesLM.Wminfo.Info.2"),
+                                  mltext("sortiesLM.Wminfo.Info.3"),
+                                  "\n", sep="")),
+               sticky="w")
+
+        tkfocus(WinInfo)
+        winSmartPlace.f(WinInfo)
+
+        ## compMultiplesLM.f(objLM=objLM, Data=Data, factSpatial="protection.status", factTemp="year", resFile=resFile)
+        compMultiplesLM.f(objLM=objLM, Data=Data, fact1=listFact[1], fact2=listFact[2],
+                          resFile=resFile, exclude=factAna, Log=Log)
+
+        ## Représentation des interactions :
+        mainTitle <- graphTitle.f(metrique=metrique,
+                                  modGraphSel=modSel, factGraph=factAna,
+                                  listFact=listFact,
+                                  model=mltext("sortiesLM.Graph.Title",
+                                               language = getOption("P.lang")),
+                                  type=type)
+
+        eval(call(winFUN, pointsize=ifelse(isTRUE(getOption("P.graphPaper")), 14, 12)))
+        par(mar=c(5, 4,
+                  ifelse(isTRUE(getOption("P.graphPaper")), 2, 5),
+                  2) + 0.1)
+        with(Data,
+             if (Log)                   # Les sens de variations peuvent changer en log (sur les moyennes) =>
+                                        # besoin d'un graphique adapté :
+         {
+             eval(parse(text=paste("interaction.plot(", listFact[1], ", ", listFact[2],
+                        ", log(", metrique, "), ylab=\"",
+                        paste(mltext("sortiesLM.Graph.ylab.pfx",
+                                     language = getOption("P.lang")),
+                              "log(", Capitalize.f(varNames[metrique, "nom"]), ")",
+                              mltext("sortiesLM.Graph.ylab.sfx",
+                                     language = getOption("P.lang")), sep=""),
+                        "\", xlab=\"", Capitalize.f(varNames[listFact[1], "nom"]),
+                        "\", main=\"",
+                        ifelse((! isTRUE(getOption("P.graphPaper"))) && isTRUE(getOption("P.title")), mainTitle, ""),
+                        "\", trace.label=\"", Capitalize.f(varNames[listFact[2], "nom"]),
+                        "\", cex.main=0.9)", sep="")))
+
+         }else{
+             eval(parse(text=paste("interaction.plot(", listFact[1], ", ", listFact[2],
+                        ", ", metrique, ", ylab=\"",
+                        paste(mltext("sortiesLM.Graph.ylab.pfx",
+                                     language = getOption("P.lang")),
+                              Capitalize.f(varNames[metrique, "nom"]),
+                              mltext("sortiesLM.Graph.ylab.sfx",
+                                     language = getOption("P.lang")),
+                              switch(varNames[metrique, "genre"],
+                                     "f"=, # Double the consonnant in French!
+                                     "fp"=mltext("sortiesLM.Graph.ylab.sfxDblCons",
+                                                       language = getOption("P.lang")),
+                                     ""),
+                              switch(varNames[metrique, "genre"],
+                                     "f"=mltext("graphTitle.f",
+                                                language = getOption("P.lang")),
+                                     "fp"=mltext("graphTitle.fp",
+                                                 language = getOption("P.lang")),
+                                     "mp"=mltext("graphTitle.mp",
+                                                 language = getOption("P.lang")),
+                                     ""), # "moyen", moyens,
+                                        # "moyenne" ou "moyennes" selon le genre.
+                              sep=""),
+                        "\", xlab=\"", Capitalize.f(varNames[listFact[1], "nom"]),
+                        "\", main=\"", ifelse((! isTRUE(getOption("P.graphPaper"))) && isTRUE(getOption("P.title")),
+                                              mainTitle, ""),
+                        "\", trace.label=\"", Capitalize.f(varNames[listFact[2], "nom"]),
+                        "\", cex.main=0.9)", sep="")))
+         })
+
+        tkdestroy(WinInfo)
+    }else{
+        if (length(listFact) == 1)
+        {
+            compSimplesLM.f(objLM=objLM, Data=Data, fact=listFact,
+                            resFile=resFile, Log=Log)
+        }else{}
+    }
+
+    subTitle <- graphTitle.f(metrique=metrique,
+                             modGraphSel=modSel, factGraph=factAna,
+                             listFact=listFact, model=modelType.f(objLM=objLM, Log=Log),
+                             type=type)
+
+    eval(call(winFUN, width=45, height=35))
+    par(mfrow=c(2, 2), oma=c(0, 0, 4.7, 0))
+    hist(objLM$residuals,
+         xlab=mltext("sortiesLM.Graph.hist.xlab",
+                     language = getOption("P.lang")),
+         ylab= mltext("sortiesLM.Graph.hist.ylab",
+                      language = getOption("P.lang")),
+         main=NULL)
+    mtext(mltext("sortiesLM.Graph.hist.title",
+                 language = getOption("P.lang")), side=3, cex=0.8)
+
+    ## Titre général :
+    mtext(mltext("sortiesLM.Graph.diag.title",
+                 language = getOption("P.lang")),
+          side=3, outer=TRUE, line=3.4, cex=1.2)
+    mtext(subTitle, side=3, outer=TRUE, line=-2.4, cex=1.1)
+
+    ## Essayer glm.diag.plots('glm')...
+    plot.lm.ml(objLM, which=2, cex.caption=0.8)
+    plot.lm.ml(objLM, which=c(1, 4), cex.caption=0.8)
+
+    ## ##################################################
+    ## Sauvegarde des données :
+    filename <- summary(resFile)$description
+
+    close(resFile)                      # Maintenant seulement on peut fermer ce fichier.
+
+    if (getOption("P.saveData") &&  ! isTRUE(sufixe == "(red)"))
+    {
+        writeData.f(filename=filename, Data=Data,
+                    cols=NULL)
+    }else{}
+
+    ## Sauvegarde des infos sur les données et statistiques :
+    if (getOption("P.saveStats") &&  ! isTRUE(sufixe == "(red)"))
+    {
+        infoStats.f(filename=filename, Data=Data, agregLevel=type, type="stat",
+                    metrique=metrique, factGraph=factAna, factGraphSel=modSel,
+                    listFact=listFact, listFactSel=listFactSel,
+                    dataEnv=dataEnv, baseEnv=baseEnv)
+    }else{}
+
+    ## flush.console()
+}
+
+
+######################################### end of the function sortiesLM.f

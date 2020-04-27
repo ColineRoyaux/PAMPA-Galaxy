@@ -106,15 +106,16 @@ calcBiodiv.f <- function(Data,
     #DataTmp <- Data
 
     ## Supression de tout ce qui n'a pas d'espèce précisee (peut être du non biotique ou identification >= genre) :
+
+    notspline <- grep("(sp\\.)$|([1-9])$|^(Absencemacrofaune)$|^(NoID)$|^(Acrobranc)$|^(Acrodigit)$|^(Acroencr)$|^(Acrosubm)$|^(Acrotabu)$|^(Adredure)$|^(Adremoll)$|^(Algaturf)$|^(Balimona)$|^(Corablan)$|^(CoradurV)$|^(Coraenal)$|^(Coramor1)$|^(Coramor2)$|^(Coramou)$|^( Dallcora)$|^(Debrcora)$|^(Debris)$|^(Hare)$|^(HexaChar)$|^(MuraCong)$|^(Nacrbran)$|^(Nacrcham)$|^(Nacrencr)$|^(Nacrfoli)$|^(Nacrmass)$|^(Nacrsubm)$|^(Recrcora)$|^(Roche)$|^(Sable)$|^(Vase)$",Data[, code.especes], value=FALSE)
+    Data <- Data[-notspline, ]
+    
+    #NotSpecies <- c("Absencemacrofaune","NoID","Acrobranc","Acrodigit","Acroencr","Acrosubm","Acrotabu","Adredure","Adremoll","Algaturf","Balimona","Corablan","CoradurV","Coraenal","Coramou"," Dallcora","Debrcora","Debris","Hare","HexaChar","MuraCong","Nacrbran","Nacrcham","Nacrencr","Nacrfoli","Nacrmass","Nacrsubm","Recrcora","Roche","Sable","Vase")
+    
+
     #if (! nrow(Data <- Data[(spTmp <- refesp$species[match(Data[ , code.especes], refesp$species.code)]) != "sp." &
      #                       !is.na(spTmp), ]))
     #{
-        #if (printInfo)
-        #{
-            #infoLoading.f(msg = paste(mltext("calcBiodiv.f.info.1")## ,
-                                      ## "\n   La table de contingence n'a pas été calculée."
-                          #), icon = "warning")
-        #}else{}
 
      #   return(Data)
     #}else{}
@@ -122,23 +123,6 @@ calcBiodiv.f <- function(Data,
     ## Suppression des niveaux de facteur inutilisés :
     Data <- dropLevels.f(df=Data)
 
-    #if (printInfo)
-    #{
-        #if (nlevels(DataTmp[ , code.especes]) > nlevels(Data[ , code.especes]))
-        #{
-            #nsup <- nlevels(DataTmp[ , code.especes]) - nlevels(Data[ , code.especes])
-            #infoLoading.f(msg=paste(nsup, " \"species.code\" ",
-                                    #ifelse(nsup > 1 ,
-                                           #mltext("calcBiodiv.f.info.2.p"),
-                                           #mltext("calcBiodiv.f.info.2.s")),
-                                    #mltext("calcBiodiv.f.info.3"),
-                                    #ifelse(nsup > 1,
-                                           #mltext("calcBiodiv.f.info.4.p"),
-                                           #mltext("calcBiodiv.f.info.4.s")),
-                                    #mltext("calcBiodiv.f.info.5"),
-                                    #sep=""))
-        #}else{}
-    #}else{}
 
     ## Si les données ne sont pas encore agrégées /espèce/unitobs on le fait ici :
     if (nrow(Data) > nrow(expand.grid(unique(Data[ , unitobs]), unique(Data[ , code.especes]))))
