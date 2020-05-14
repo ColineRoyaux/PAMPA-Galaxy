@@ -1,28 +1,21 @@
-<tool id="pampa_communitymetrics" name="Calculate community metrics" version="@VERSION@">
-    <description>calculate community metrics from abundance data</description>
+<tool id="pampa_presabs" name="Calculate presence absence table" version="@VERSION@">
+    <description>calculate presence absence table from observation data</description>
     <macros>
         <import>pampa_macros.xml</import>
     </macros>
     <command detect_errors="exit_code"><![CDATA[
         Rscript 
-         '$__tool_directory__/FunctExeCalcCommIndexesGalaxy.r' 
+         '$__tool_directory__/FunctExeCalcPresAbsGalaxy.r' 
          '$input'
-         '$indexes'
          '$__tool_directory__/FunctPAMPAGalaxy.r' 
-         '$output_community'
+         '$output_presabs'
     ]]>
     </command>
     <inputs>
         <expand macro="pampa_input_calculate"/>
-        <param name="indexes" type="select" label="Choose the community metrics you want to compute" help="Presence/absence, Species richness, Simpson and Shannon index are systematically computed." multiple="true">
-            <option selected="true" value="all">All</option>
-            <option value="simpson.l">1-Simpson</option>
-            <option value="pielou">Pielou</option>
-            <option value="hill">Hill</option>
-        </param>
     </inputs>
     <outputs>
-        <data name="output_community" from_work_dir="TabCommunityIndexes.tabular" format="tabular"/>
+        <data name="output_presabs" from_work_dir="TabPresAbs.tabular" format="tabular"/>
     </outputs>
     <tests>
         <test> 
@@ -30,19 +23,13 @@
         </test>
     </tests>
     <help><![CDATA[
-===============================================
-Calculate community metrics from abundance data
-===============================================
+====================================================
+Calculate presence absence table from abundance data
+====================================================
 
 **What it does**
 
-This tool from PAMPA toolsuite computes community metrics from abundance data.
-- Specific richness
-- Shannon index
-- Simpson index
-- Pielou index
-- Hill index
-- Relative richness
+This tool from PAMPA toolsuite computes an abundance (max and standard deviation if SVR data) and presence absence table at finest aggregation possible from observation data
 
 |
 
@@ -67,7 +54,9 @@ The data frame may also contain :
 
 **Output**
 
-A  tabular file with every metrics selected computed per observation unit
+
+A tabular file with presence/absence at finest aggregation available (per observation unit per species OR per observation unit per species per size class)
+
 
 |
 
