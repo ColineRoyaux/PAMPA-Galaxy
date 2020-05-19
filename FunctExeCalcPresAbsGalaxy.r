@@ -30,7 +30,7 @@ obs<- read.table(Importdata,sep="\t",dec=".",header=TRUE,encoding="UTF-8") #
 obs[obs == -999] <- NA 
 factors <- fact.det.f(Obs=obs)
 ObsType <- def.typeobs.f(Obs=obs)
-create.unitobs(data=obs)
+obs <- create.unitobs(data=obs)
 
 vars_data<-c("observation.unit","species.code","number")
 err_msg_data<-"The input dataset doesn't have the right format. It need to have at least the following 3 variables :\n- observation.unit\n- species.code\n- number\n"
@@ -71,7 +71,7 @@ calc.presAbs.f <- function(Data,
 
 res <- calc.numbers.f(obs, ObsType=ObsType , factors=factors, nbName="number")
 res$pres.abs <- calc.presAbs.f(res, nbName="number")
-
+res <- create.year.point(res)
 
 #Save dataframe in a tabular format
 filenamePresAbs <- "TabPresAbs.tabular"
