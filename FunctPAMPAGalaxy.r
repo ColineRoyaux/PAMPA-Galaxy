@@ -58,8 +58,28 @@ create.unitobs <- function(data,year="year",point="point", unitobs="observation.
 {
     if (!is.element("observation.unit",colnames(data)))
     {
-        unite(data,col=unitobs,c(year,point))
-    }else{}
+        unitab <- unite(data,col="observation.unit",c(year,point))
+    }else{ 
+        unitab <- data
+    }
+    return(unitab)
+}
+######################################### start of the function create.unitobs
+
+######################################### start of the function create.year.point called by FunctExeCalcCommIndexesGalaxy.r and FunctExeCalcPresAbsGalaxy.r
+####### separate unitobs column when existant
+create.year.point <- function(data,year="year",point="point", unitobs="observation.unit")
+{
+    if (all(grepl("[1-2][0|8|9][0-9]{2}_.*",data[,unitobs]))==TRUE)
+    {
+        tab <- separate(data,col=unitobs,into=c(year,point),sep="_")
+        tab <- cbind(tab,data[,unitobs])
+    }else{
+        tab <- separate(data,col=unitobs,into=c("site1", year,"obs"),sep=c(2,4))
+        tab <- unite(tab, col=point, c("site1","obs"))
+        tab <- cbind(tab,data[,unitobs])
+    }
+    return(tab)
 }
 ######################################### start of the function create.unitobs
 
@@ -961,7 +981,7 @@ calcLM.f <- function(loiChoisie, formule, metrique, Data)
 ######################################### end of the function calcLM.f
 
 ######################################### start of the function sortiesLM.f called by modeleLineaireWP2.unitobs.f in FunctExeCalcGLMGalaxy.r
-sortiesLM.f <- function(objLM, formule, metrique, factAna, modSel, listFact, listFactSel, Data, dataEnv, 
+sortiesLM.f <- function(objLM, formule, metrique, factAna, modSel, listFact, listFactSel, Data, dataEnv,
                         Log=FALSE, sufixe=NULL, type="espece", baseEnv=.GlobalEnv)
 {
     ## Purpose: Formater les résultats de lm et les écrire dans un fichier
@@ -1017,28 +1037,11 @@ sortiesLM.f <- function(objLM, formule, metrique, factAna, modSel, listFact, lis
     ## if (all(is.element(c("year", "protection.status"), listFact)))
     if (length(listFact) == 2)
     {
-    #    WinInfo <- tktoplevel()
-     #   on.exit(tkdestroy(WinInfo))
-      #  tkwm.title(WinInfo, mltext("sortiesLM.W.Title"))
-
-       # tkgrid(tklabel(WinInfo, text="\t "),
-        #       tklabel(WinInfo, text=paste0("\n", mltext("sortiesLM.Wminfo.Info.1"), "\n")),
-         #      tklabel(WinInfo, text="\t "),
-          #     sticky="w")
-
-        #tkgrid(tklabel(WinInfo, text="\t "),
-         #      tklabel(WinInfo,
-          #             text=paste(mltext("sortiesLM.Wminfo.Info.2"),
-           #                       mltext("sortiesLM.Wminfo.Info.3"),
-            #                      "\n", sep="")),
-             #  sticky="w")
-
-        #tkfocus(WinInfo)
-        #winSmartPlace.f(WinInfo)
+ 
 
         ## compMultiplesLM.f(objLM=objLM, Data=Data, factSpatial="protection.status", factTemp="year", resFile=resFile)
         compMultiplesLM.f(objLM=objLM, Data=Data, fact1=listFact[1], fact2=listFact[2],
-                          resFile=resFile, exclude=factAna, Log=Log)
+                          resFile=resFile,Log=Log)
 
         ## Représentation des interactions :suppr
         
@@ -1129,7 +1132,7 @@ signifParamLM.f <- function(objLM, metrique, listFact, resFile)
     ## Purpose: Écrire les résultats de l'anova globale du modèle et
     ##          l'estimation de significativités des coefficients du modèle.
     ## ----------------------------------------------------------------------
-    ## Arguments: objLM un objet de classe 'lm' ou 'glm'.
+    ## Arguments: objLM un objet de classe 'lm' ou 'glm'.compM
     ##            resFile : une connection pour les sorties.
     ## ----------------------------------------------------------------------
     ## Author: Yves Reecht, Date:  8 sept. 2010, 17:07
@@ -1145,7 +1148,7 @@ signifParamLM.f <- function(objLM, metrique, listFact, resFile)
         varstd$var <- c("Variance",var)
         colnames(varstd) <- rep("",length(colnames(varstd)))
 
-        cat("\n---------------------------------------------------------------------------", 
+        cat("---------------------------------------------------------------------------", 
             "\nSummary table :",
             "\n\nFamily : ", sumLM$family, ", link : ", sumLM$link,
             "\nResponse : ", metrique,
@@ -1156,7 +1159,7 @@ signifParamLM.f <- function(objLM, metrique, listFact, resFile)
         cat("\nNumber of obs : ", sumLM$nobs,", groups : ",sumLM$ngrps$cond,
             file=resFile,append=TRUE)
         ## Significativités des paramètres :
-        cat("\n\n", "Parameter significances :", #"\n(only the significant factors/interactions are shown):",
+        cat("\n\n", "Parameter significances (fixed effects) :", #"\n(only the significant factors/interactions are shown):",
             "\n\n",
             file=resFile,append=TRUE)
 
@@ -1286,7 +1289,7 @@ printCoefmat.red <- function(x, digits = max(3, getOption("digits") - 2),
     ## Author: Yves Reecht, Date: 31 août 2010, 10:46
 
     ## Sélection des coefficients à montrer (pour effets/interactions significatifs) :
-    x <- x[selRowCoefmat(x, anovaLM, objLM), , drop=FALSE]
+    #x <- x[selRowCoefmat(x, anovaLM, objLM), , drop=FALSE]
 
     ## Définitions issues de la fonction originale :
     if (is.null(d <- dim(x)) || length(d) != 2L)
@@ -1378,104 +1381,6 @@ printCoefmat.red <- function(x, digits = max(3, getOption("digits") - 2),
 
 ######################################### end of the function printCoefmat.red
 
-######################################### start of the function selRowCoefmat called by printCoefmat.red
-selRowCoefmat <- function(coefsMat, anovaLM, objLM)
-{
-    ## Purpose: Retourne un vecteur de booléen donnant les indices de ligne
-    ##          de la matrice de coefs correspondant à des facteurs ou
-    ##          intéractions significatifs (les autres coefs n'ont pas
-    ##          d'intéret).
-    ## ----------------------------------------------------------------------
-    ## Arguments: coefsMat : matrice de coefficients.
-    ##            anovaLM : objet correspondant de classe 'anova.lm'.
-    ##            objLM : l'objet de classe 'lm' (nécessaire pour traiter
-    ##                    les cas de NAs)
-    ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 31 août 2010, 14:31
-
-    if (!is.null(anovaLM))
-    {
-
-        ## Facteurs et intéractions dont les coefs doivent être imprimés :
-        selectedFactInt <- attr(anovaLM, "row.names")[which(anovaLM[[grep("P[r(]", attr(anovaLM, "names"))]] < 0.05)]
-
-        ## Tous les facteurs :
-        facts <- attr(anovaLM, "row.names")[!is.na(anovaLM[[grep("P[r(]", attr(anovaLM, "names"))]])]
-
-        ## indices des intéractions dans "selectedFactInt" :
-        has.interactions <- TRUE
-        interactions <- grep(":", facts, fixed=TRUE)
-        if (length(interactions) == 0)
-        {
-            interactions <- length(facts) + 1
-            has.interactions <- FALSE
-        }else{}
-
-        ## Coefficients par facteur (sans compter les intéractions) :
-        if (length(facts) == 1)
-        {
-            factsRows <- list(grep(paste("^", facts, sep=""), row.names(coefsMat), value=TRUE))
-            names(factsRows) <- facts
-
-        }else{
-            factsRows <- ## sapply(
-                sapply(facts[-c(interactions)],
-                       function(fact)
-                   {
-                       grep(paste("^", fact, sep=""),
-                                 row.names(coefsMat), value=TRUE)[! grepl(":",
-                                                                          grep(paste("^", fact, sep=""),
-                                                                               row.names(coefsMat), value=TRUE),
-                                                                          fixed=TRUE)]
-                   }, simplify=FALSE)## , as.vector)
-        }
-
-
-
-        ## type de coef (facteur et intéractions) par ligne de la matrice de coef :
-        rows <- c("(Intercept)",
-                  ## facteurs :
-                  unlist(sapply(1:length(factsRows),
-                                function(i)
-                            {
-                                rep(names(factsRows)[i], length(factsRows[[i]]))
-                            })))
-
-        ## intéractions :
-        if (has.interactions)
-        {
-            ## nombre de répétitions par type d'intéraction :
-
-            ## liste des nombres de modalités pour chaque facteur d'une intéraction :
-            nmod <- sapply(strsplit(facts[interactions], ":"),
-                           function(fa) sapply(fa, function(i)length(factsRows[[i]])))
-
-            if (!is.list(nmod))         # corrige un bug lorsqu'uniquement 1 type d'intéraction).
-            {
-                nmod <- list(as.vector(nmod))
-            }else{}
-
-            ## Nombres de répétitions :
-            nrep <- sapply(nmod, prod)
-
-            ## Ajout des types d'intéractions :
-            rows <- c(rows,
-                      unlist(sapply(1:length(nrep), function(i)
-                                {
-                                    rep(facts[interactions][i], nrep[i])
-                                })))
-        }else{}
-
-        ## Lignes conservées :
-        return(is.element(rows, c("(Intercept)", selectedFactInt))[!is.na(objLM$coefficients)])
-    }else{
-        return(rep(TRUE, nrow(coefsMat)))
-        
-    }
-}
-
-######################################### end of the function selRowCoefmat
-
 ######################################### start of the function valPreditesLM.f called by sortiesLM.f
 
 valPreditesLM.f <- function(objLM, Data, listFact, resFile)
@@ -1531,7 +1436,7 @@ valPreditesLM.f <- function(objLM, Data, listFact, resFile)
 
 ######################################### start of the function compMultiplesLM.f called by sortiesLM.f
 
-compMultiplesLM.f <- function(objLM, Data, fact1, fact2, resFile, exclude, Log=FALSE)
+compMultiplesLM.f <- function(objLM, Data, fact1, fact2, resFile, exclude="", Log=FALSE)
 {
     ## Purpose: Calculer et écrire les résultats des comparaisons multiples.
     ## ----------------------------------------------------------------------
@@ -1618,11 +1523,13 @@ compMultiplesLM.f <- function(objLM, Data, fact1, fact2, resFile, exclude, Log=F
                          ""),
                   ":\n", sep=""),
             file=resFile,append=TRUE)
-
-        capture.output(print.summary.glht.red(summary(glht(objLM,
-                                                           linfct=get(paste("diff", i, sep="")),
-                                                           alternative="two.sided"))),
-                       file=resFile,append=TRUE)
+        #if (all(get(paste("diff", i, sep="") > 0)))
+        #{
+         #   capture.output(print.summary.glht.red(summary(glht(objLM,
+          #                                                     linfct=get(paste("diff", i, sep="")),
+           #                                                    alternative="two.sided"))),
+            #               file=resFile,append=TRUE)
+        #}else{}
     }
 }
 
@@ -1642,7 +1549,7 @@ is.temporal.f <- function(facteur, table)
                   function(x)
               {
                   switch(x,
-                         an={           # An est toujours censé être temporel.
+                         year={           # An est toujours censé être temporel.
                              TRUE
                          },
                          annee.campagne={           # Vérifié en amont.
@@ -1747,7 +1654,12 @@ diffTemporelles.f <- function(objLM, factSpatial, factTemp, Data, exclude)
     ## Author: Yves Reecht, Date:  8 sept. 2010, 11:11
 
     ## Coefficients :
-    theta <- coef(objLM)
+    if (length(grep("^glmmTMB", objLM$call)) > 0)
+    {
+        theta <- c(levels(objLM$frame[,factTemp]),levels(objLM$frame[,factSpatial]))
+    }else{
+        theta <- names(coef(objLM))
+    }
 
     tDiff <- paste(c(head(rev(levels(Data[ , factTemp])), 1), head(rev(levels(Data[ , factTemp])),  - 1)),
                    c(tail(rev(levels(Data[ , factTemp])), 1), tail(rev(levels(Data[ , factTemp])),  - 1)),
@@ -1761,16 +1673,23 @@ diffTemporelles.f <- function(objLM, factSpatial, factTemp, Data, exclude)
                     ncol=length(theta))
 
     ## Noms des colonnes (pas obligatoire mais utile pour vérification) :
+
     row.names(Dtemp) <- paste(rep(levels(Data[ , factSpatial]), each=nlevels(Data[ , factTemp])),
                               tDiff,
                               sep=" : ")
 
 
-    colnames(Dtemp) <- names(theta)
+    colnames(Dtemp) <- theta
 
     ## Noms de colonnes ordonnés :
-    namesCol <- c(colnames(Data)[1],
-                  colnames(objLM$model[ , -1]))
+    if (length(grep("^glmmTMB", objLM$call)) > 0)
+    {
+        namesCol <- c(colnames(Data)[1],
+                      colnames(objLM$frame[ , -1]))
+    }else{
+        namesCol <- c(colnames(Data)[1],
+                      colnames(objLM$model[ , -1]))
+    }
 
     namesCol <- namesCol[! is.element(namesCol, exclude)] # - colonne exclue
 
@@ -1793,41 +1712,42 @@ diffTemporelles.f <- function(objLM, factSpatial, factTemp, Data, exclude)
     ## Position des facteurs d'intérêt et leur interaction,
     ## dans l'ordre de l'ensemble des facteurs et interactions :
     facts <- c(factSpatial, factTemp)
-    posTemp <- which(attr(objLM$terms, "term.labels") == factTemp)
-    posSpatial <- which(attr(objLM$terms, "term.labels") == factSpatial)
-    posInteraction <- which(is.element(attr(objLM$terms, "term.labels"),
-                                       paste(facts, rev(facts), sep=":")))
+    posTemp <- 1
+    posSpatial <- 2
+    #posInteraction <- which(is.element(attr(objLM$terms, "term.labels"),
+     #                                  paste(facts, rev(facts), sep=":")))
 
     ## Différences sur l'effet temporel seul :
     d1 <- rbind(c(-1, rep(0, nCol[posTemp] - 1), 1),
                 cbind(0, diag(1, nCol[posTemp])[ , seq(nCol[posTemp], 1)]) +
                 cbind(diag(-1, nCol[posTemp])[ , seq(nCol[posTemp], 1)], 0))[ , -1]
 
+
     Dtemp[ , seq(from=premiereCol[posTemp],
                  length.out=nCol[posTemp])] <- sapply(as.data.frame(d1), rep, nlevels(Data[ , factSpatial]))
 
 
     ## Différences sur les interactions :
-    d2 <- Dtemp[ , seq(from=premiereCol[posInteraction],
-                        length.out=nCol[posInteraction]), drop=FALSE]
+#    d2 <- Dtemp[ , seq(from=premiereCol[posInteraction],
+ #                       length.out=nCol[posInteraction]), drop=FALSE]
 
-    l <- nlevels(Data[ , factTemp]) + 1
-    for (i in seq(from=0, length.out=nCol[posSpatial]))
-    {
-        if (posSpatial > posTemp)       # traitement différent selon l'imbrication des facteurs :
-        {                               # Cas où le facteur temporel est en premier :
-            d2[seq(from=l, length.out=nlevels(Data[ , factTemp])) ,
-               seq(from=1, length.out=nCol[posTemp]) + i * nCol[posTemp]] <- d1
-        }else{                          #... cas où il est en second :
-            d2[seq(from=l, length.out=nlevels(Data[ , factTemp])) ,
-               seq(from=1 + i, by=nCol[posSpatial], length.out=nCol[posTemp])] <- d1
-        }
-
-        l <- l + nlevels(Data[ , factTemp])
-    }
-
-    Dtemp[ , seq(from=premiereCol[posInteraction],
-                 length.out=nCol[posInteraction])] <- d2
+  #  l <- nlevels(Data[ , factTemp]) + 1
+   # for (i in seq(from=0, length.out=nCol[posSpatial]))
+    #{
+     #   if (posSpatial > posTemp)       # traitement différent selon l'imbrication des facteurs :
+      #  {                               # Cas où le facteur temporel est en premier :
+       #     d2[seq(from=l, length.out=nlevels(Data[ , factTemp])) ,
+        #       seq(from=1, length.out=nCol[posTemp]) + i * nCol[posTemp]] <- d1
+#        }else{                          #... cas où il est en second :
+ #           d2[seq(from=l, length.out=nlevels(Data[ , factTemp])) ,
+  #             seq(from=1 + i, by=nCol[posSpatial], length.out=nCol[posTemp])] <- d1
+   #     }
+#
+ #       l <- l + nlevels(Data[ , factTemp])
+  #  }
+#
+ #   Dtemp[ , seq(from=premiereCol[posInteraction],
+  #               length.out=nCol[posInteraction])] <- d2
 
     return(Dtemp)
 
@@ -1851,10 +1771,15 @@ diffSpatiales.f <- function(objLM, factSpatial, factTemp, Data, exclude)
     ## Author: Yves Reecht, Date:  7 sept. 2010, 16:15
 
     ## Coefficients :
-    theta <- coef(objLM)
-
+    if (length(grep("^glmmTMB", objLM$call)) > 0)
+    {
+        theta <- c(levels(objLM$frame[,factTemp]),levels(objLM$frame[,factSpatial]))
+    }else{
+        theta <- names(coef(objLM))
+    }
     ## Nom des différences spatiales (statut de protection) :
-    sDiff <- apply(combn(levels(Data[ , factSpatial]), 2),
+
+    sDiff <- apply(combn(unique(Data[ , factSpatial]), 2),
                    2,
                    function(x){paste(rev(x), collapse = " - ")})
 
@@ -1864,13 +1789,19 @@ diffSpatiales.f <- function(objLM, factSpatial, factTemp, Data, exclude)
                     ncol=length(theta))
 
     ## Noms des colonnes (pas obligatoire mais utile pour vérification) :
-    row.names(Dspat) <- paste(levels(Data[ , factTemp]),
-                              rep(sDiff, each=nlevels(Data[ , factTemp])), sep=" : ")
-    colnames(Dspat) <- names(theta)
+    #row.names(Dspat) <- paste(levels(Data[ , factTemp]),
+     #                         rep(sDiff, each=nlevels(Data[ , factTemp])), sep=" : ")
+    colnames(Dspat) <- theta
 
     ## Noms de colonnes ordonnés :
-    namesCol <- c(colnames(Data)[1],
-                  colnames(objLM$model[ , -1]))
+    if (length(grep("^glmmTMB", objLM$call)) > 0)
+    {
+        namesCol <- c(colnames(Data)[1],
+                      colnames(objLM$frame[ , -1]))
+    }else{
+        namesCol <- c(colnames(Data)[1],
+                      colnames(objLM$model[ , -1]))
+    }
 
     namesCol <- namesCol[! is.element(namesCol, exclude)] # - colonne exclue
 
@@ -1893,12 +1824,13 @@ diffSpatiales.f <- function(objLM, factSpatial, factTemp, Data, exclude)
     ## Position des facteurs d'intérêt et leur interaction,
     ## dans l'ordre de l'ensemble des facteurs et interactions :
     facts <- c(factSpatial, factTemp)
-    posTemp <- which(attr(objLM$terms, "term.labels") == factTemp)
-    posSpatial <- which(attr(objLM$terms, "term.labels") == factSpatial)
-    posInteraction <- which(is.element(attr(objLM$terms, "term.labels"),
-                                       paste(facts, rev(facts), sep=":")))
+    posTemp <- 1
+    posSpatial <- 2
+    #posInteraction <- which(is.element(attr(objLM$terms, "term.labels"),
+     #                                  paste(facts, rev(facts), sep=":")))
 
     ## Différences entres les effets statuts (sans intéraction temporelles) :
+
     tmp <- sapply(as.data.frame(combn(1:nlevels(Data[ , factSpatial]), 2)),
                   function(x)
               {
@@ -1921,40 +1853,41 @@ diffSpatiales.f <- function(objLM, factSpatial, factTemp, Data, exclude)
     Dspat[ , premiereCol[posSpatial] - 1 + 1:nCol[posSpatial]] <- m[ , -1]
 
     ## Ajout des intéractions :
-    tmp2 <- Dspat[ , seq(from=premiereCol[posInteraction], length.out=nCol[posInteraction]), drop=FALSE]
+  #  tmp2 <- Dspat[ , seq(from=premiereCol[posInteraction], length.out=nCol[posInteraction]), drop=FALSE]
+#
+  #  l <- 1
+   # for (i in as.data.frame(combn(0:nCol[posSpatial], 2))) # pour chaque combinaison de statut :
+    #{
+     #   if(i[1] != 0)
+      #  {
+       #     d1 <- rbind(0, diag(-1, nrow=nCol[posTemp]))
+        #    if (posSpatial > posTemp)   # facteur spatial après le facteur temporel...
+         #   {
+          #      tmp[seq(from=l, length.out=nlevels(Data[ , factTemp])),
+           #          seq(from=(i[1] - 1) * nCol[posTemp] + 1, length.out=nCol[posTemp])] <- d1
+            #}else{                      # ... avant le facteur temporel.
+             #   tmp[seq(from=l, length.out=nlevels(Data[ , factTemp])),
+              #       seq(from=i[1], by=nCol[posSpatial] , length.out=nCol[posTemp])] <- d1
+            #}
+        #}else{}
 
-    l <- 1
-    for (i in as.data.frame(combn(0:nCol[posSpatial], 2))) # pour chaque combinaison de statut :
-    {
-        if(i[1] != 0)
-        {
-            d1 <- rbind(0, diag(-1, nrow=nCol[posTemp]))
-            if (posSpatial > posTemp)   # facteur spatial après le facteur temporel...
-            {
-                tmp2[seq(from=l, length.out=nlevels(Data[ , factTemp])),
-                     seq(from=(i[1] - 1) * nCol[posTemp] + 1, length.out=nCol[posTemp])] <- d1
-            }else{                      # ... avant le facteur temporel.
-                tmp2[seq(from=l, length.out=nlevels(Data[ , factTemp])),
-                     seq(from=i[1], by=nCol[posSpatial] , length.out=nCol[posTemp])] <- d1
-            }
-        }else{}
+      #  d2 <- rbind(0, diag(1, nrow=nCol[posTemp]))
 
-        d2 <- rbind(0, diag(1, nrow=nCol[posTemp]))
+       # if (posSpatial > posTemp)       # facteur spatial après le facteur temporel...
+        #{
+         #   stop(tmp)
+      #      tmp[seq(from=l, length.out=nlevels(Data[ , factTemp])),
+       #          seq(from=(i[2] - 1) * nCol[posTemp] + 1, length.out=nCol[posTemp])] <- d2
+        #}else{                          # ... avant le facteur temporel.
+         #   tmp[seq(from=l, length.out=nlevels(Data[ , factTemp])),
+          #       seq(from=i[2], by=nCol[posSpatial], length.out=nCol[posTemp])] <- d2
+        #}
 
-        if (posSpatial > posTemp)       # facteur spatial après le facteur temporel...
-        {
-            tmp2[seq(from=l, length.out=nlevels(Data[ , factTemp])),
-                 seq(from=(i[2] - 1) * nCol[posTemp] + 1, length.out=nCol[posTemp])] <- d2
-        }else{                          # ... avant le facteur temporel.
-            tmp2[seq(from=l, length.out=nlevels(Data[ , factTemp])),
-                 seq(from=i[2], by=nCol[posSpatial], length.out=nCol[posTemp])] <- d2
-        }
-
-        l <- l + nlevels(Data[ , factTemp])
-    }
-
-    ## Stockage des différences d'interactions :
-    Dspat[ , seq(from=premiereCol[posInteraction], length.out=nCol[posInteraction])] <- tmp2
+     #   l <- l + nlevels(Data[ , factTemp])
+    #}
+#
+ #   ## Stockage des différences d'interactions :
+  #  Dspat[ , seq(from=premiereCol[posInteraction], length.out=nCol[posInteraction])] <- tmp2
 
     return(Dspat)
 }
@@ -2177,344 +2110,43 @@ compSimplesLM.f <- function(objLM, Data, fact, resFile, Log=FALSE)
 
 ######################################### end of the function compSimplesLM.f
 
-######################################### start of the function plot.lm.ml called by sortiesLM.f
-
-plot.lm.ml <- function (x, which = c(1L:3L, 5L),
-                        caption = list("Residuals vs Fitted",
-                                       "'Normal Q-Q plot': standardized vs theoretical quantiles",
-                                       "Scale-Location",
-                                       "Cook's distance",
-                                       "Residuals vs Leverage",
-                                       substitute(expression(title1 * h[ii]/(1 - h[ii])),
-                                                  list(title1 = paste0("Cook's distance vs Leverage",
-                                                                       "  ")))),
-                        panel = if (add.smooth) panel.smooth else points, sub.caption = NULL,
-                        main = "", ask = prod(par("mfcol")) < length(which) && dev.interactive(),
-                        ..., id.n = 3, labels.id = names(residuals(x)), cex.id = 0.75,
-                        qqline = TRUE, cook.levels = c(0.5, 1), add.smooth = getOption("add.smooth"),
-                        label.pos = c(4, 2), cex.caption = 1,
-                        print.sub.caption=FALSE)
+######################################### start of the function diffTempSimples.f called by compSimplesLM.f
+diffTempSimples.f <- function(objLM, fact, Data)
 {
     ## Purpose:
     ## ----------------------------------------------------------------------
-    ## Arguments:
-    ##           + print.sub.caption : Imprimer le sub.caption automatique.
+    ## Arguments: objLM : un objet de classe 'lm' ou 'glm'.
+    ##            factSpatial : nom du facteur spatial.
+    ##            factTemp : nom du facteur temporel.
+    ##            Data : données utilisées pour ajuster le modèle.
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 17 sept. 2010, 09:46
+    ## Author: Yves Reecht, Date:  4 oct. 2010, 16:28
 
-    dropInf <- function(x, h) {
-        if (any(isInf <- h >= 1)) {
-            warning("Not plotting observations with leverage one:\n  ",
-                    paste(which(isInf), collapse = ", "), call. = FALSE)
-            x[isInf] <- NaN
-        }
-        x
+    tDiff <- paste(c(head(rev(levels(Data[ , fact])), 1), head(rev(levels(Data[ , fact])),  - 1)),
+                   c(tail(rev(levels(Data[ , fact])), 1), tail(rev(levels(Data[ , fact])),  - 1)),
+                   sep=" - ")
+
+    ## Coefficients :
+    if (length(grep("^glmmTMB", objLM$call)) > 0)
+    {
+        theta <- levels(objLM$frame[,fact])
+    }else{
+        theta <- names(coef(objLM))
     }
-    if (!inherits(x, "lm"))
-        stop("use only with \"lm\" objects")
-    if (!is.numeric(which) || any(which < 1) || any(which > 6))
-        stop("'which' must be in 1:6")
-    isGlm <- inherits(x, "glm")
-    show <- rep(FALSE, 6)
-    show[which] <- TRUE
-    r <- residuals(x)
-    yh <- predict(x)
-    w <- weights(x)
-    if (!is.null(w)) {
-        wind <- w != 0
-        r <- r[wind]
-        yh <- yh[wind]
-        w <- w[wind]
-        labels.id <- labels.id[wind]
-    }
-    n <- length(r)
-    if (any(show[2L:6L])) {
-        s <- if (inherits(x, "rlm"))
-            x$s
-        else if (isGlm)
-            sqrt(summary(x)$dispersion)
-        else sqrt(deviance(x)/df.residual(x))
-        hii <- lm.influence(x, do.coef = FALSE)$hat
-        if (any(show[4L:6L])) {
-            cook <- if (isGlm)
-                cooks.distance(x)
-            else cooks.distance(x, sd = s, res = r)
-        }
-    }
-    if (any(show[2L:3L])) {
-        ylab23 <- if (isGlm)
-            "Std. deviance resid."      # [!!!]
-        else "Standardized residuals"
-        r.w <- if (is.null(w))
-            r
-        else sqrt(w) * r
-        rs <- dropInf(r.w/(s * sqrt(1 - hii)), hii)
-    }
-    if (any(show[5L:6L])) {
-        r.hat <- range(hii, na.rm = TRUE)
-        isConst.hat <- all(r.hat == 0) || diff(r.hat) < 1e-10 *
-            mean(hii, na.rm = TRUE)
-    }
-    if (any(show[c(1L, 3L)]))
-        l.fit <- if (isGlm)
-            "Predicted values"
-        else "Fitted values"
-    if (is.null(id.n))
-        id.n <- 0
-    else {
-        id.n <- as.integer(id.n)
-        if (id.n < 0L || id.n > n)
-            stop(gettextf("'id.n' must be in {1,..,%d}", n),
-                 domain = NA)
-    }
-    if (id.n > 0L) {
-        if (is.null(labels.id))
-            labels.id <- paste(1L:n)
-        iid <- 1L:id.n
-        show.r <- sort.list(abs(r), decreasing = TRUE)[iid]
-        if (any(show[2L:3L]))
-            show.rs <- sort.list(abs(rs), decreasing = TRUE)[iid]
-        text.id <- function(x, y, ind, adj.x = TRUE) {
-            labpos <- if (adj.x)
-                label.pos[1 + as.numeric(x > mean(range(x)))]
-            else 3
-            text(x, y, labels.id[ind], cex = cex.id, xpd = TRUE,
-                 pos = labpos, offset = 0.25)
-        }
-    }
-    getCaption <- function(k) if (length(caption) < k)
-        NA_character_
-    else as.graphicsAnnot(caption[[k]])
-    if (is.null(sub.caption)) {
-        cal <- x$call
-        if (!is.na(m.f <- match("formula", names(cal)))) {
-            cal <- cal[c(1, m.f)]
-            names(cal)[2L] <- ""
-        }
-        cc <- deparse(cal, 80)
-        nc <- nchar(cc[1L], "c")
-        abbr <- length(cc) > 1 || nc > 75
-        sub.caption <- if (abbr)
-            paste(substr(cc[1L], 1L, min(75L, nc)), "...")
-        else cc[1L]
-    }
-    one.fig <- prod(par("mfcol")) == 1
-    if (ask) {
-        oask <- devAskNewPage(TRUE)
-        on.exit(devAskNewPage(oask))
-    }
-    if (show[1L]) {
-        ylim <- range(r, na.rm = TRUE)
-        if (id.n > 0)
-            ylim <- extendrange(r = ylim, f = 0.08)
-        plot(yh, r, xlab = l.fit, ylab = "Residuals",
-             main = main,
-             ylim = ylim, type = "n", ...)
-        panel(yh, r, ...)
-        if (one.fig)
-            title(sub = sub.caption, ...)
-        mtext(getCaption(1), 3, 0.25, cex = cex.caption)
-        if (id.n > 0) {
-            y.id <- r[show.r]
-            y.id[y.id < 0] <- y.id[y.id < 0] - strheight(" ")/3
-            text.id(yh[show.r], y.id, show.r)
-        }
-        abline(h = 0, lty = 3, col = "gray")
-    }
-    if (show[2L]) {
-        ylim <- range(rs, na.rm = TRUE)
-        ylim[2L] <- ylim[2L] + diff(ylim) * 0.075
-        qq <- qqnorm(rs, main = main, ylab = ylab23, ylim = ylim,
-                     xlab="Theoretical quantiles",
-                     ...)
-        if (qqline)
-            qqline(rs, lty = 3, col = "gray50")
-        if (one.fig)
-            title(sub = sub.caption, ...)
-        mtext(getCaption(2), 3, 0.25, cex = cex.caption)
-        if (id.n > 0)
-            text.id(qq$x[show.rs], qq$y[show.rs], show.rs)
-    }
-    if (show[3L]) {
-        sqrtabsr <- sqrt(abs(rs))
-        ylim <- c(0, max(sqrtabsr, na.rm = TRUE))
-        yl <- as.expression(substitute(sqrt(abs(YL)), list(YL = as.name(ylab23))))
-        yhn0 <- if (is.null(w))
-            yh
-        else yh[w != 0]
-        plot(yhn0, sqrtabsr, xlab = l.fit, ylab = yl, main = main,
-             ylim = ylim, type = "n", ...)
-        panel(yhn0, sqrtabsr, ...)
-        if (one.fig)
-            title(sub = sub.caption, ...)
-        mtext(getCaption(3), 3, 0.25, cex = cex.caption)
-        if (id.n > 0)
-            text.id(yhn0[show.rs], sqrtabsr[show.rs], show.rs)
-    }
-    if (show[4L]) {
-        if (id.n > 0) {
-            show.r <- order(-cook)[iid]
-            ymx <- cook[show.r[1L]] * 1.075
-        }
-        else ymx <- max(cook, na.rm = TRUE)
-        plot(cook, type = "h", ylim = c(0, ymx), main = main,
-             xlab = "Obs. number",
-             ylab = "Cook's distance",
-             ...)
-        if (one.fig)
-            title(sub = sub.caption, ...)
-        mtext(getCaption(4), 3, 0.25, cex = cex.caption)
-        if (id.n > 0)
-            text.id(show.r, cook[show.r], show.r, adj.x = FALSE)
-    }
-    if (show[5L]) {
-        ylab5 <- if (isGlm)
-            "Pearson's std. residuals"
-        else "Standardized residuals"
-        r.w <- residuals(x, "pearson")
-        if (!is.null(w))
-            r.w <- r.w[wind]
-        rsp <- dropInf(r.w/(s * sqrt(1 - hii)), hii)
-        ylim <- range(rsp, na.rm = TRUE)
-        if (id.n > 0) {
-            ylim <- extendrange(r = ylim, f = 0.08)
-            show.rsp <- order(-cook)[iid]
-        }
-        do.plot <- TRUE
-        if (isConst.hat) {
-            if (missing(caption))
-                caption[[5L]] <- "Constant leverage:\n Residuals vs factor levels"
-            aterms <- attributes(terms(x))
-            dcl <- aterms$dataClasses[-aterms$response]
-            facvars <- names(dcl)[dcl %in% c("factor", "ordered")]
-            mf <- model.frame(x)[facvars]
-            if (ncol(mf) > 0) {
-                effM <- mf
-                for (j in seq_len(ncol(mf))) effM[, j] <- sapply(split(yh,
-                                                                       mf[, j]), mean)[mf[, j]]
-                ord <- do.call(order, effM)
-                dm <- data.matrix(mf)[ord, , drop = FALSE]
-                nf <- length(nlev <- unlist(unname(lapply(x$xlevels,
-                                                          length))))
-                ff <- if (nf == 1)
-                    1
-                else rev(cumprod(c(1, nlev[nf:2])))
-                facval <- ((dm - 1) %*% ff)
-                facval[ord] <- facval
-                xx <- facval
-                plot(facval, rsp, xlim = c(-1/2, sum((nlev -
-                                  1) * ff) + 1/2), ylim = ylim, xaxt = "n", main = main,
-                     xlab = "Factor levels combinations",
-                     ylab = ylab5,
-                     type = "n", ...)
-                axis(1, at = ff[1L] * (1L:nlev[1L] - 1/2) - 1/2,
-                     labels = x$xlevels[[1L]][order(sapply(split(yh,
-                     mf[, 1]), mean))])
-                mtext(paste(facvars[1L], ":"), side = 1, line = 0.25,
-                      adj = -0.05)
-                abline(v = ff[1L] * (0:nlev[1L]) - 1/2, col = "gray",
-                       lty = "F4")
-                panel(facval, rsp, ...)
-                abline(h = 0, lty = 3, col = "gray")
-            }
-            else {
-                message("hat values (leverages) are all = ",
-                        format(mean(r.hat)), "\n and there are no factor predictors; no plot no. 5")
-                frame()
-                do.plot <- FALSE
-            }
-        }
-        else {
-            xx <- hii
-            xx[xx >= 1] <- NA
-            plot(xx, rsp, xlim = c(0, max(xx, na.rm = TRUE)),
-                 ylim = ylim, main = main,
-                 xlab = "Leverage",
-                 ylab = ylab5, type = "n", ...)
-            panel(xx, rsp, ...)
-            abline(h = 0, v = 0, lty = 3, col = "gray")
-            if (one.fig)
-                title(sub = sub.caption, ...)
-            if (length(cook.levels)) {
-                p <- length(coef(x))
-                usr <- par("usr")
-                hh <- seq.int(min(r.hat[1L], r.hat[2L]/100),
-                              usr[2L], length.out = 101)
-                for (crit in cook.levels) {
-                    cl.h <- sqrt(crit * p * (1 - hh)/hh)
-                    lines(hh, cl.h, lty = 2, col = 2)
-                    lines(hh, -cl.h, lty = 2, col = 2)
-                }
-                legend("bottomleft",
-                       legend = "Cook's distance",
-                       lty = 2, col = 2, bty = "n")
-                xmax <- min(0.99, usr[2L])
-                ymult <- sqrt(p * (1 - xmax)/xmax)
-                aty <- c(-sqrt(rev(cook.levels)) * ymult, sqrt(cook.levels) *
-                         ymult)
-                axis(4, at = aty, labels = paste(c(rev(cook.levels),
-                                  cook.levels)), mgp = c(0.25, 0.25, 0), las = 2,
-                     tck = 0, cex.axis = cex.id, col.axis = 2)
-            }
-        }
-        if (do.plot) {
-            mtext(getCaption(5), 3, 0.25, cex = cex.caption)
-            if (id.n > 0) {
-                y.id <- rsp[show.rsp]
-                y.id[y.id < 0] <- y.id[y.id < 0] - strheight(" ")/3
-                text.id(xx[show.rsp], y.id, show.rsp)
-            }
-        }
-    }
-    if (show[6L]) {
-        g <- dropInf(hii/(1 - hii), hii)
-        ymx <- max(cook, na.rm = TRUE) * 1.025
-        plot(g, cook, xlim = c(0, max(g, na.rm = TRUE)), ylim = c(0,
-                                                                  ymx), main = main,
-             ylab = "Cook's distance",
-             xlab = substitute(expression(title1 *
-                                          h[ii]),
-                               list(title1 = paste0("Factor levels combinations",
-                                                    "  "))),
-             xaxt = "n", type = "n", ...)
-        panel(g, cook, ...)
-        athat <- pretty(hii)
-        axis(1, at = athat/(1 - athat), labels = paste(athat))
-        if (one.fig)
-            title(sub = sub.caption, ...)
-        p <- length(coef(x))
-        bval <- pretty(sqrt(p * cook/g), 5)
-        usr <- par("usr")
-        xmax <- usr[2L]
-        ymax <- usr[4L]
-        for (i in seq_along(bval)) {
-            bi2 <- bval[i]^2
-            if (ymax > bi2 * xmax) {
-                xi <- xmax + strwidth(" ")/3
-                yi <- bi2 * xi
-                abline(0, bi2, lty = 2)
-                text(xi, yi, paste(bval[i]), adj = 0, xpd = TRUE)
-            }
-            else {
-                yi <- ymax - 1.5 * strheight(" ")
-                xi <- yi/bi2
-                lines(c(0, xi), c(0, yi), lty = 2)
-                text(xi, ymax - 0.8 * strheight(" "), paste(bval[i]),
-                     adj = 0.5, xpd = TRUE)
-            }
-        }
-        mtext(getCaption(6), 3, 0.25, cex = cex.caption)
-        if (id.n > 0) {
-            show.r <- order(-cook)[iid]
-            text.id(g[show.r], cook[show.r], show.r)
-        }
-    }
-    if (!one.fig && par("oma")[3L] >= 1 && print.sub.caption)
-        mtext(sub.caption, outer = TRUE, cex = 1.25)
-    invisible()
+    diffDim <- length(theta)
+
+    diffMat <- matrix(0, ncol=diffDim, nrow=diffDim,
+                      dimnames=list(tDiff, theta))
+
+
+    ## Différences sur l'effet temporel seul :
+    diffMat[ , -1] <- rbind(c(-1, rep(0, diffDim - 2), 1),
+                            cbind(0, diag(1, diffDim - 1)[ , seq(diffDim - 1, 1)]) +
+                            cbind(diag(-1, diffDim - 1)[ , seq(diffDim - 1, 1)], 0))[ , -1]
+
+    return(diffMat)
 }
-
-######################################### end of the function plot.lm.ml
+######################################### end of the function diffTempSimples.f 
 
 ######################################### start of the function infoStats.f called by sortiesLM.f
 

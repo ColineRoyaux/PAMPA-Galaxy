@@ -8,14 +8,18 @@
         Rscript 
          '$__tool_directory__/FunctExeCalcGLMGalaxy1.r' 
          '$input_metric'
-         '$input_refesp'
          '$input_unitobs'
          '$varint'
          '$varrep'
          '$varrand'
-         ''
-         ''
-         ''
+         'statut_protection'
+         #if $settings.advanced=='advanced' 
+             $settings.distrib
+             $settings.log
+         #else
+             'None'
+             'FALSE'
+         #end if
          'unit'
          'FALSE'
          '$__tool_directory__/FunctPAMPAGalaxy.r' 
@@ -25,18 +29,33 @@
     </command>
     <inputs>
         <param name="input_metric" type="data" format="tabular" label="Input metrics file" help="Observation data file, with location, year, species and abundance."/>
-        <param name="input_refesp" type="data" format="tabular" label="Species referential file" help="Species referential file, with taxonomy."/>
         <param name="input_unitobs" type="data" format="tabular" label="Unitobs informations file" help="Unitobs file, with all informations available about unitobs."/>
         <param name="varint" type="data_column" data_ref="input_metric" label="Interest variable" help= "Choose the field of the interest variable."/>
         <param name="varrep" type="select" label="Response variables" help= "Choose the response variables you want to include in your analysis." multiple="true">
-            <option selected="true" value="factor(year)">Year</option>
+            <option selected="true" value="year">Year</option>
             <option selected="true" value="site">Site</option>
             <option selected="true" value="habitat1">Habitat</option>
         </param>
         <param name="varrand" type="select" label="Random effect ?" help="Allocate a random effect on site or year makes your model more reliable as random events on a peculiar site or year can affect populations, it takes account of pseudoreplication. However, the running time is longer for every new  and it can't be applied on a less than 10 levels variable (less than 10 different sites and/or year)." multiple="true">
-            <option value="factor(year)">Year</option>
+            <option value="year">Year</option>
             <option selected="true" value="site">Site</option>
         </param>
+        <conditional name="settings">
+            <expand macro="pampa_advanced_params_select"/>
+            <when value="advanced">
+                <param name="distrib" type="select" label="Distribution for model">
+                    <option selected="true" value="None">Auto</option>
+                    <option value="gaussian">Gaussian</option>
+                    <option value="inverse.gaussian">Inverse Gaussian</option>
+                    <option value="poisson">Poisson</option>
+                    <option value="quasipoisson">Quasi-Poisson</option>
+                    <option value="binomial">Binomial</option>
+                    <option value="quasibinomial">Quasi-Binomial</option>
+                    <option value="Gamma">Gamma</option>
+                </param>
+                <param name="log" type="boolean" truevalue="TRUE" falsevalue="FALSE" checked="yes" label="Log on interest variable ?"/>
+            </when>
+        </conditional>
     </inputs>
     <outputs>
         <data name="output_summary" from_work_dir="GLMSummary.txt" format="txt"/>
