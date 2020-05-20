@@ -88,11 +88,11 @@ modeleLineaireWP2.unitobs.f <- function(metrique, listFact, listRand, FactAna, D
         RespFact <- paste(listFact, collapse=" + ")
     }
     ##Creating model's expression :
-    if (log == FALSE) {
+    #if (log == FALSE) {
         exprML <- eval(parse(text=paste(metrique, "~", RespFact)))
-    }else{
-        exprML <- eval(parse(text=paste("log(",metrique,")", "~", RespFact)))
-    }
+    #}else{
+     #   exprML <- eval(parse(text=paste("log(",metrique,")", "~", RespFact)))
+    #}
 
     ##Creating analysis table :
     listFactTab <- c(listFact, FactAna)
@@ -122,12 +122,8 @@ modeleLineaireWP2.unitobs.f <- function(metrique, listFact, listRand, FactAna, D
     if (Distrib == "None") 
     {
         switch(class(tmpData[,metrique]),
-              "integer"={
-                         loiChoisie <- "poisson"
-              },
-              "numeric"={
-                         loiChoisie <- "gaussian"
-              },
+              "integer"={loiChoisie <- "poisson"},
+              "numeric"={loiChoisie <- "gaussian"},
               )
     }else{
         loiChoisie <- Distrib
@@ -142,30 +138,23 @@ modeleLineaireWP2.unitobs.f <- function(metrique, listFact, listRand, FactAna, D
         cutData <- tmpData[grep(cut,tmpData[,FactAna]),]
         cutData <- dropLevels.f(cutData)
 
-        FactUni <- c()
-        for (i in listFact) #Determining the presence of single level factors 
+        resFile <- "GLMSummary.txt"
+        cat("--------------------------------------------------------------------------------\n",
+            "--------------------------------------------------------------------------------\n Analysis for level ",cut,
+            " :\n--------------------------------------------------------------------------------\n--------------------------------------------------------------------------------\n",
+            sep="",file=resFile,append=TRUE)
+
+        res <-""
+        if (listRand[1] != "None")
         {
-            if (length(unique(na.omit(cutData[,i]))) < 2) 
-            {
-                FactUni <- c(FactUni,i)
-            }else{}
-            #levels(cutData[,i]) <- sort(unique(cutData[,i]))
+            res <- tryCatch(glmmTMB(exprML,family=loiChoisie, data=cutData), error=function(e){})
+        }else{
+            res <- tryCatch(glm(exprML,data=cutData,family=loiChoisie), error=function(e){})
         }
 
-        resFile <- "GLMSummary.txt"
-        cat("-----------------------------------------------------------\n Analysis for level ",cut," :\n-----------------------------------------------------------\n",file=resFile,append=TRUE)
-
-        if (is.null(FactUni))
-        {
-            if (listRand[1] != "None")
-            {
-                res <- glmmTMB(exprML,family=loiChoisie, data=cutData)
-            }else{
-                res <- glm(exprML,data=cutData,family=loiChoisie)
-            }
-
           ## Écriture des résultats formatés dans un fichier :
-
+         if (! is.null(res))
+         {
             sortiesLM.f(objLM=res, formule=exprML, metrique=metrique,
                         #factAna=factAna, modSel=iFactGraphSel, listFactSel=listFactSel,
                         listFact=listFact,
@@ -175,7 +164,7 @@ modeleLineaireWP2.unitobs.f <- function(metrique, listFact, listRand, FactAna, D
                                     "unitobs"))
 
         }else{
-            cat("Factor(s) with only one level : \n -",paste(FactUni,collapse="\n - "),"\n",file=resFile,append=TRUE)
+            cat("\nOne or more factor(s) have only one level \n\n",file=resFile,append=TRUE)
         }
     }
 
