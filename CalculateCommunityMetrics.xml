@@ -3,6 +3,7 @@
     <macros>
         <import>pampa_macros.xml</import>
     </macros>
+    <expand macro="Pampa_requirements"/>
     <command detect_errors="exit_code"><![CDATA[
         Rscript 
          '$__tool_directory__/FunctExeCalcCommIndexesGalaxy.r' 
@@ -73,7 +74,7 @@ A  tabular file with every metrics selected computed per observation unit
 
 **Source**
 
-Derived from PAMPA scripts (lien ?) written by Yves Reecht.
+Derived from PAMPA scripts (https://wwz.ifremer.fr/pampa/Meth.-Outils/Outils) written by Yves Reecht.
 
   ]]></help>
 
