@@ -44,9 +44,9 @@ tabUnitobs <- read.table(ImportUnitobs,sep="\t",dec=".",header=TRUE,encoding="UT
 tabUnitobs[tabUnitobs == -999] <- NA 
 #factors <- fact.det.f(Obs=obs)
 
-vars_data<-c("observation.unit","species.code","number")
-err_msg_data<-"The input dataset doesn't have the right format. It need to have at least the following 3 variables :\n- observation.unit\n- species.code\n- number\n"
-#check_file(obs,err_msg_data,vars_data,3)
+vars_data<- NULL
+err_msg_data<-"The input metrics dataset doesn't have the right format. It needs to have at least the following 2 variables :\n- observation.unit (or year and site)\n- numeric or integer metric\n"
+check_file(obs,err_msg_data,vars_data,2)
 
 
 ####################################################################################################
@@ -96,7 +96,7 @@ modeleLineaireWP2.unitobs.f <- function(metrique, listFact, listRand, FactAna, D
 
     ##Creating analysis table :
     listFactTab <- c(listFact, FactAna)
-    if(tableMetrique == "unit")
+    if(! is.element(c("species.code","size.class"),colnames(tmpData)))
     {
         col <- c(unitobs,metrique)
         tmpData <- cbind(tmpData[,col], tabUnitobs[match(tmpData[,unitobs],tabUnitobs[,unitobs]),listFactTab])
@@ -104,15 +104,9 @@ modeleLineaireWP2.unitobs.f <- function(metrique, listFact, listRand, FactAna, D
 
         for (i in listFactTab) {
             tmpData[,i] <- as.factor(tmpData[,i])
-            #switch(i,
-             #     "year" = {tmpData[,"year"] <- as.factor(tmpData[,"year"])},
-              #    "site" = {tmpData[,"site"] <- as.factor(tmpData[,"site"])},
-               #   "habitat1" = {tmpData[,"habitat1"] <- as.factor(tmpData[,"habitat1"])},
-                #  "statut_protection" = {tmpData[,"statut_protection"] <- as.factor(tmpData[,"statut_protection"])},
-                 # )
          }
     }else{
-        stop("Warning")
+        stop("Warning : wrong data frame, data frame should be aggregated by observation unit (year and site)")
     }
 
     ## Suppression des 'levels' non utilisés :
@@ -124,7 +118,7 @@ modeleLineaireWP2.unitobs.f <- function(metrique, listFact, listRand, FactAna, D
         switch(class(tmpData[,metrique]),
               "integer"={loiChoisie <- "poisson"},
               "numeric"={loiChoisie <- "gaussian"},
-              )
+              stop("Selected metric class doesn't fit, you should select an integer or a numeric variable"))
     }else{
         loiChoisie <- Distrib
     }
@@ -145,6 +139,7 @@ modeleLineaireWP2.unitobs.f <- function(metrique, listFact, listRand, FactAna, D
             sep="",file=resFile,append=TRUE)
 
         res <-""
+
         if (listRand[1] != "None")
         {
             res <- tryCatch(glmmTMB(exprML,family=loiChoisie, data=cutData), error=function(e){})
@@ -156,7 +151,7 @@ modeleLineaireWP2.unitobs.f <- function(metrique, listFact, listRand, FactAna, D
          if (! is.null(res))
          {
             sortiesLM.f(objLM=res, formule=exprML, metrique=metrique,
-                        #factAna=factAna, modSel=iFactGraphSel, listFactSel=listFactSel,
+                        factAna=factAna, #modSel=iFactGraphSel, listFactSel=listFactSel,
                         listFact=listFact,
                         Data=cutData, #Log=Log,
                         type=ifelse(tableMetrique == "unitSpSz" && factAna != "size.class",

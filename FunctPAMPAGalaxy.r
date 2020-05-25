@@ -73,12 +73,14 @@ create.year.point <- function(data,year="year",point="point", unitobs="observati
     if (all(grepl("[1-2][0|8|9][0-9]{2}_.*",data[,unitobs]))==TRUE)
     {
         tab <- separate(data,col=unitobs,into=c(year,point),sep="_")
-        tab <- cbind(tab,data[,unitobs])
     }else{
         tab <- separate(data,col=unitobs,into=c("site1", year,"obs"),sep=c(2,4))
         tab <- unite(tab, col=point, c("site1","obs"))
-        tab <- cbind(tab,data[,unitobs])
+
     }
+
+    tab <- cbind(tab,observation.unit = data[,unitobs])
+
     return(tab)
 }
 ######################################### start of the function create.unitobs
@@ -90,7 +92,7 @@ create.year.point <- function(data,year="year",point="point", unitobs="observati
 #Faut rentrer le nom du jeu de données, le nbre et le nom des variables / Enter dataset name,  expected number and names of variables. + an exit error message to guide user.
 
 check_file<-function(dataset,err_msg,vars,nb_vars){
-    if(ncol(dataset) < nb_vars){ #Verifiction de la présence du bon nb de colonnes, si c'est pas le cas= message d'erreur / checking for right number of columns in the file if not = error message
+    if(ncol(dataset) <= nb_vars){ #Verifiction de la présence du bon nb de colonnes, si c'est pas le cas= message d'erreur / checking for right number of columns in the file if not = error message
         cat("\nerr nb var\n") 
         stop(err_msg, call.=FALSE)
     }
@@ -1143,10 +1145,11 @@ signifParamLM.f <- function(objLM, metrique, listFact, resFile)
 
         anovaLM <- NULL
         sumLM <- summary(objLM)
-        var <- as.numeric(sumLM$varcor$cond)
-        varstd <- as.data.frame(capture.output(sumLM$varcor)[-c(1:2)])
-        varstd$var <- c("Variance",var)
-        colnames(varstd) <- rep("",length(colnames(varstd)))
+        #varstd <- as.data.frame(capture.output(sumLM$varcor)[5:13])
+        varstd <- capture.output(sumLM)
+        #var <- as.numeric(sumLM$varcor$cond)
+        #varstd$var <- c("Variance",var)
+        #colnames(varstd) <- rep("",length(colnames(varstd)))
 
         cat("---------------------------------------------------------------------------", 
             "\nSummary table :",
@@ -1155,9 +1158,15 @@ signifParamLM.f <- function(objLM, metrique, listFact, resFile)
             "\n\nAIC table : \n\n AIC\tBIC\tlogLik\tdeviance\tdf.resid\n", sumLM$AICtab,
             file=resFile,append=TRUE)
         cat("\n\nAnalysis of Variance table (random effects) :\n",file=resFile,append=TRUE)
-        capture.output(varstd,file=resFile,append=TRUE)     
-        cat("\nNumber of obs : ", sumLM$nobs,", groups : ",sumLM$ngrps$cond,
-            file=resFile,append=TRUE)
+
+        cat("\n",varstd[grep("^ Groups",
+                        varstd)],
+            "\n",paste(varstd[grep(paste("^ ",paste(listFact,collapse="|")),varstd)][-1],
+                       collapse="\n"),
+            "\n",file=resFile,append=TRUE)    
+ 
+        #cat("\nNumber of obs : ", sumLM$nobs,", groups : ",paste(sumLM$ngrps$cond,collapse=" ; "),
+         #   file=resFile,append=TRUE)
         ## Significativités des paramètres :
         cat("\n\n", "Parameter significances (fixed effects) :", #"\n(only the significant factors/interactions are shown):",
             "\n\n",
@@ -1405,30 +1414,42 @@ valPreditesLM.f <- function(objLM, Data, listFact, resFile)
         OrdreNivFact <- matrix(OrdreNivFact, ncol=1, dimnames=list(NULL, listFact))
     }else{}
 
+    valPredites <- NULL
     ## Valeurs prédites pour chaque combinaison réalisée des facteurs :
     if (length(grep("^glm", objLM$call)) > 0)
     {
-        valPredites <- predict(objLM, newdata=unique(Data[ , listFact, drop=FALSE]), type="response")
+        valPredites <- tryCatch(predict(objLM, newdata=unique(Data[ , listFact, drop=FALSE]), type="response"), error=function(e){})
     }else{
-        valPredites <- predict(objLM, newdata=unique(Data[ , listFact, drop=FALSE]))
+        valPredites <- tryCatch(predict(objLM, newdata=unique(Data[ , listFact, drop=FALSE])), error=function(e){})
     }
 
-    ## Noms des valeurs prédites (combinaisons des différents niveaux de facteurs) :
-    nomCoefs <- unique(apply(Data[ , listFact, drop=FALSE], 1, paste, collapse=":"))
-    names(valPredites) <- nomCoefs
 
-    ## On remet les modalités en ordre :
-    valPredites <- valPredites[eval(parse(text=paste("order(",
+    if (! is.null(valPredites)) {
+        ## Noms des valeurs prédites (combinaisons des différents niveaux de facteurs) :
+        nomCoefs <- unique(apply(Data[ , listFact, drop=FALSE], 1, paste, collapse=":"))
+        names(valPredites) <- nomCoefs
+
+        ## On remet les modalités en ordre :
+        valPredites <- valPredites[eval(parse(text=paste("order(",
                                           paste("OrdreNivFact[ , ", 1:ncol(OrdreNivFact), "]", sep="", collapse=", "),
                                           ")", sep="")))]
 
-    ## Écriture de l'en-tête :
-    cat("\n\n\n---------------------------------------------------------------------------",
-        "\n", "Values predicted by the model:", "\n\n",
-        file=resFile,append=TRUE)
+        ## Écriture de l'en-tête :
+        cat("\n\n\n---------------------------------------------------------------------------",
+            "\n", "Values predicted by the model:", "\n\n",
+            file=resFile,append=TRUE)
 
-    ## Écriture du résultat :
-    capture.output(print(valPredites), file=resFile,append=TRUE)
+        ## Écriture du résultat :
+        capture.output(print(valPredites), file=resFile,append=TRUE)
+    }else{
+        ## Écriture de l'en-tête :
+        cat("\n\n\n---------------------------------------------------------------------------",
+            "\n", "Values predicted by the model:", "\n\n",
+            file=resFile,append=TRUE)
+
+        ## Error
+        cat("\nNo values have been predicted : When using random effect(s), NAs can cause problems in predictions when one or several levels of a factor can only be combined with NAs from other factor \n\n",file=resFile,append=TRUE)
+    }
 
 }
 
