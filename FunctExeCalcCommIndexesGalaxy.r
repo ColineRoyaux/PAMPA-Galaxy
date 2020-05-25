@@ -6,7 +6,9 @@
 #####################################################################################################################
 #####################################################################################################################
 
-###################### Packages R base
+###################### Packages R 
+
+suppressMessages(library(tidyr))
 
 ###################### Load arguments and declaring variables
 
@@ -29,8 +31,8 @@ if (length(args) < 4) {
 obs<- read.table(Importdata,sep="\t",dec=".",header=TRUE,encoding="UTF-8") #
 obs[obs == -999] <- NA 
 factors <- fact.det.f(Obs=obs)
-
 ObsType <- def.typeobs.f(Obs=obs)
+obs <- create.unitobs(data=obs)
 
 vars_data<-c("observation.unit","species.code","number")
 err_msg_data<-"The input dataset doesn't have the right format. It need to have at least the following 3 variables :\n- observation.unit\n- species.code\n- number\n"
@@ -84,7 +86,10 @@ calcBiodiv.f <- function(Data,
     ## Supression de tout ce qui n'a pas d'espèce précisee (peut être du non biotique ou identification >= genre) :
 
     notspline <- grep("(sp\\.)$|([1-9])$|^(Absencemacrofaune)$|^(NoID)$|^(Acrobranc)$|^(Acrodigit)$|^(Acroencr)$|^(Acrosubm)$|^(Acrotabu)$|^(Adredure)$|^(Adremoll)$|^(Algaturf)$|^(Balimona)$|^(Corablan)$|^(CoradurV)$|^(Coraenal)$|^(Coramor1)$|^(Coramor2)$|^(Coramou)$|^( Dallcora)$|^(Debrcora)$|^(Debris)$|^(Hare)$|^(HexaChar)$|^(MuraCong)$|^(Nacrbran)$|^(Nacrcham)$|^(Nacrencr)$|^(Nacrfoli)$|^(Nacrmass)$|^(Nacrsubm)$|^(Recrcora)$|^(Roche)$|^(Sable)$|^(Vase)$",Data[, code.especes], value=FALSE)
-    Data <- Data[-notspline, ]
+    if (length(notspline) != 0)
+    {
+        Data <- Data[-notspline, ]
+    }else{}
     
     #NotSpecies <- c("Absencemacrofaune","NoID","Acrobranc","Acrodigit","Acroencr","Acrosubm","Acrotabu","Adredure","Adremoll","Algaturf","Balimona","Corablan","CoradurV","Coraenal","Coramou"," Dallcora","Debrcora","Debris","Hare","HexaChar","MuraCong","Nacrbran","Nacrcham","Nacrencr","Nacrfoli","Nacrmass","Nacrsubm","Recrcora","Roche","Sable","Vase")
     
@@ -184,6 +189,7 @@ tableCommunityIndexes <- calcBiodiv.f(res, #refesp,
                          MPA, unitobs="observation.unit", code.especes="species.code", nombres="number",
                          indices=index, global=FALSE, printInfo=FALSE #, dataEnv=.GlobalEnv
                          )
+tableCommunityIndexes <- create.year.point(tableCommunityIndexes)
 #Save dataframe in a tabular format
 
 filenameComm <- "TabCommunityIndexes.tabular"
