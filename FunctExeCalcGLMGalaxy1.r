@@ -25,7 +25,7 @@ if (length(args) < 11) {
     colmetric <- as.numeric(args[3]) ###### Selected interest metric for GLM
     listFact <- strsplit(args [4],",")[[1]] ###### Selected response factors for GLM
     listRand <- strsplit(args [5],",")[[1]] ###### Selected randomized response factors for GLM
-    FactAna <- args[6] ####### (optional) Selected splitting factors for GLMs
+    colFactAna <- args[6] ####### (optional) Selected splitting factors for GLMs
     Distrib <- args[7] ###### (optional) Selected distribution for GLM 
     log <- args[8] ###### (Optional) Log on interest metric ?
     aggreg <- args[9] ###### Aggregation level of the data table
@@ -42,6 +42,16 @@ obs[obs == -999] <- NA
 metric <- colnames(obs)[colmetric]
 tabUnitobs <- read.table(ImportUnitobs,sep="\t",dec=".",header=TRUE,encoding="UTF-8")
 tabUnitobs[tabUnitobs == -999] <- NA 
+
+if (colFactAna != "None")
+{
+    FactAna <- colnames(tabUnitobs)[as.numeric(colFactAna)]
+    if (class(tabUnitobs[FactAna]) == "numeric" || FactAna == "observation.unit"){stop("Wrong chosen separation factor : Analysis can't be separated by observation unit or numeric factor")}
+}else{
+    FactAna <- colFactAna
+}
+
+
 #factors <- fact.det.f(Obs=obs)
 
 vars_data<- NULL
@@ -96,7 +106,9 @@ modeleLineaireWP2.unitobs.f <- function(metrique, listFact, listRand, FactAna, D
 
     ##Creating analysis table :
     listFactTab <- c(listFact, FactAna)
-    if(! is.element(c("species.code","size.class"),colnames(tmpData)))
+    listFactTab <- listFactTab[listFactTab != "None"]
+
+    if(! is.element("species.code",colnames(tmpData)))
     {
         col <- c(unitobs,metrique)
         tmpData <- cbind(tmpData[,col], tabUnitobs[match(tmpData[,unitobs],tabUnitobs[,unitobs]),listFactTab])
@@ -126,13 +138,20 @@ modeleLineaireWP2.unitobs.f <- function(metrique, listFact, listRand, FactAna, D
     Allfact <- c(metrique,listFact)
 
     ## Compute Model(s) :
+    if (FactAna != "None" && nlevels(tmpData[,FactAna]) > 1)
+    {
+        Anacut <- levels(tmpData[,FactAna])
+    }else{
+        Anacut <- NULL
+    }
 
-    for (cut in levels(tmpData[,FactAna])) 
+    resFile <- "GLMSummary.txt"
+    
+    for (cut in Anacut) 
     {
         cutData <- tmpData[grep(cut,tmpData[,FactAna]),]
         cutData <- dropLevels.f(cutData)
 
-        resFile <- "GLMSummary.txt"
         cat("--------------------------------------------------------------------------------\n",
             "--------------------------------------------------------------------------------\n Analysis for level ",cut,
             " :\n--------------------------------------------------------------------------------\n--------------------------------------------------------------------------------\n",
@@ -161,7 +180,32 @@ modeleLineaireWP2.unitobs.f <- function(metrique, listFact, listRand, FactAna, D
         }else{
             cat("\nOne or more factor(s) have only one level \n\n",file=resFile,append=TRUE)
         }
+
     }
+
+    ## Global analysis : 
+
+
+    cat("--------------------------------------------------------------------------------\n",
+        "--------------------------------------------------------------------------------\n Global analysis",
+        " :\n--------------------------------------------------------------------------------\n--------------------------------------------------------------------------------\n",
+        sep="",file=resFile,append=TRUE)
+
+    if (listRand[1] != "None")
+    {
+        resG <- glmmTMB(exprML,family=loiChoisie, data=tmpData)
+    }else{
+        resG <- glm(exprML,data=tmpData,family=loiChoisie)
+    }
+
+    ## Écriture des résultats formatés dans un fichier :
+    sortiesLM.f(objLM=resG, formule=exprML, metrique=metrique,
+                #factAna=factAna, modSel=iFactGraphSel, listFactSel=listFactSel,
+                listFact=listFact,
+                Data=tmpData, #Log=Log,
+                type=ifelse(tableMetrique == "unitSpSz" && factAna != "size.class",
+                            "CL_unitobs",
+                            "unitobs"))
 
 }
 

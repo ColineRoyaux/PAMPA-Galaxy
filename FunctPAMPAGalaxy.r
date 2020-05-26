@@ -1159,10 +1159,11 @@ signifParamLM.f <- function(objLM, metrique, listFact, resFile)
             file=resFile,append=TRUE)
         cat("\n\nAnalysis of Variance table (random effects) :\n",file=resFile,append=TRUE)
 
-        cat("\n",varstd[grep("^ Groups",
-                        varstd)],
-            "\n",paste(varstd[grep(paste("^ ",paste(listFact,collapse="|")),varstd)][-1],
-                       collapse="\n"),
+        cat("\n",paste(varstd[c(grep("Groups",
+                        varstd):grep("Number of obs",
+                        varstd))], collapse="\n"),
+            #"\n",paste(varstd[grep(paste("^ ",paste(listFact,collapse="|")),varstd)][-1],
+             #          collapse="\n"),
             "\n",file=resFile,append=TRUE)    
  
         #cat("\nNumber of obs : ", sumLM$nobs,", groups : ",paste(sumLM$ngrps$cond,collapse=" ; "),
