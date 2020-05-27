@@ -1,5 +1,5 @@
-<tool id="pampa_glm" name="Compute your GLM" version="@VERSION@">
-    <description>Compute a GLM of your choice from your data</description>
+<tool id="pampa_glm" name="Compute GLM on community data" version="@VERSION@">
+    <description>Compute a GLM of your choice on community data</description>
     <macros>
         <import>pampa_macros.xml</import>
     </macros>
@@ -12,7 +12,7 @@
          '$varint'
          '$varrep'
          '$varrand'
-         'statut_protection'
+         '$sep'
          #if $settings.advanced=='advanced' 
              $settings.distrib
              $settings.log
@@ -31,12 +31,13 @@
         <param name="input_metric" type="data" format="tabular" label="Input metrics file" help="Metrics data file, with location, year, and metrics informations as 'species richness', 'Simpson index' or others who can be used as interest variable."/>
         <param name="input_unitobs" type="data" format="tabular" label="Unitobs informations file" help="Unitobs file, with all informations available about unitobs."/>
         <param name="varint" type="data_column" data_ref="input_metric" label="Interest variable from metrics file" help= "Choose the field of the interest variable."/>
+        <param name="sep" type="data_column" data_ref="input_unitobs" force_select="false" label="Separation factor of your analysis from unitobs file" help= "Choose the field of the separation factor, for each level of this factor, one GLM will be computed."/>
         <param name="varrep" type="select" label="Response variables" help= "Choose the response variables you want to include in your analysis." multiple="true">
             <option selected="true" value="year">Year</option>
             <option selected="true" value="site">Site</option>
             <option selected="true" value="habitat1">Habitat</option>
         </param>
-        <param name="varrand" type="select" label="Random effect ?" help="Allocate a random effect on site or year makes your model more reliable as random events on a peculiar site or year can affect populations, it takes account of pseudoreplication. However, the running time is longer for every new  and it can't be applied on a less than 10 levels variable (less than 10 different sites and/or year)." multiple="true">
+        <param name="varrand" type="select" label="Random effect ?" help="Allocate a random effect on site or year makes your model more reliable as random events on a peculiar site or year can affect populations, it takes account of pseudoreplication. However, avoid applying it on a less than 10 levels variable (less than 10 different sites and/or year)." multiple="true">
             <option value="year">Year</option>
             <option selected="true" value="site">Site</option>
         </param>
@@ -58,8 +59,8 @@
         </conditional>
     </inputs>
     <outputs>
-        <data name="output_summary" from_work_dir="GLMSummary.txt" format="txt"/>
-        <data name="output_recap" from_work_dir="GLMSummaryFull.txt" format="txt"/>
+        <data name="output_summary" from_work_dir="GLMSummary.txt" format="txt" label="GLM - Results from your Analysis"/>
+        <data name="output_recap" from_work_dir="GLMSummaryFull.txt" format="txt" label="Simple statistics on chosen variables"/>
     </outputs>
     <tests>
         <test> 
@@ -73,49 +74,71 @@ Compute GLM with selected interest variables
 
 **What it does**
 
-This tool from PAMPA toolsuite computes community metrics from abundance data.
-- Presence / absence
-- Specific richness
-<!-- - Shannon index -->
-- Simpson index
-- Pielou index
-- Hill index
-- Relative richness
+This tool from PAMPA toolsuite computes Generalized Linear Models on community data. 
+
+It allows user to choose composition of the model :
+
+- Interest variable among numeric or integer variables of the input file
+
+- Response variables among year, site and/or habitat
+
+- Allocation of random effect on year and/or site
 
 |
 
 **Input description**
 
-A tabular file with observation data. Must at least contain three columns "observation.unit" 
-which associate year and location, "species.code" with species ID and "number" for abundance.
+A tabular file with community data. Must at least contain two or three columns depending on the case : 
 
-+------------------+--------------+------------+
-| observation.unit | species.code |   number   |
-+==================+==============+============+
-|   site_yearID    |   speciesID  |      4     |
-+------------------+--------------+------------+
-|        ...       |      ...     |     ...    |
-+------------------+--------------+------------+
+- ['year' and 'location'] or ['observation.unit'] 
 
-The data frame may also contain : 
-- "size.class" field with 'G' representing big individuals in given species, 'M'middle-sized individuals and 'P' small individuals
-- "rotation" field for STAVIRO data
+- At least one community metric 
+
++------------------+---------+---------+-----+       
+| observation.unit | metric1 | metric2 | ... |            
++==================+=========+=========+=====+        
+|   site_yearID    |    2    |   0.4   | ... |            
++------------------+---------+---------+-----+        
+|        ...       |   ...   |   ...   | ... |       
++------------------+---------+---------+-----+           
+
+OR
+
++------+----------+---------+---------+-----+
+| year | location | metric1 | metric2 | ... |
++======+==========+=========+=========+=====+
+| 2000 |locationID|    2    |   0.4   | ... |
++------+----------+---------+---------+-----+
+|  ... |    ...   |   ...   |   ...   | ... |
++------+----------+---------+---------+-----+
+
+The first input may be extracted from the 'Calculate community metrics' tool.
+
+A tabular file with unitobs or location data which contains at least as much columns as used response variables and separation factor in addition with the 'observation.unit' or 'location' column.
+
++--------------------------------+---------+--------+------------+-----+       
+| observation.unit OR location   | ??site? |  year  |  habitat1  | ... |            
++================================+=========+========+============+=====+        
+|  site_yearID     OR locationID | site ID |  2000  | habitatID  | ... |            
++--------------------------------+---------+--------+------------+-----+        
+|              ...               |   ...   |   ...  |     ...    | ... |       
++--------------------------------+---------+--------+------------+-----+ 
 
 |
 
 **Output**
 
-Two tabular files : 
+Two text files : 
 
-- A first tabular file with presence/absence at finest aggregation available (per observation unit per species OR per observation unit per species per size class)
+- A first text file with GLM results. When a separation factor is selected, one analysis is computed for every level and the last analysis is on the whole dataset.
 
-- A second tabular file with every metrics selected computed per observation unit
+- A second text file with simple statistics on the whole dataset.
 
 |
 
 **Source**
 
-Derived from PAMPA scripts (lien ?) written by Yves Reecht.
+Derived from PAMPA scripts (https://wwz.ifremer.fr/pampa/Meth.-Outils/Outils) written by Yves Reecht.
 
   ]]></help>
 
