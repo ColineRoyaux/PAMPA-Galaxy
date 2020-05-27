@@ -17,7 +17,7 @@ args = commandArgs(trailingOnly=TRUE)
 #options(encoding = "UTF-8")
 
 if (length(args) < 11) {
-    stop("At least one argument must be supplied, an input dataset file (.tabular).", call.=FALSE) #si pas d'arguments -> affiche erreur et quitte / if no args -> error and exit1
+    stop("At least 4 arguments must be supplied : \n- two input dataset files (.tabular) : metrics table and unitobs table \n- Interest variable field from metrics table \n- Response variable from unitobs table.", call.=FALSE) #si pas d'arguments -> affiche erreur et quitte / if no args -> error and exit1
 
 } else {
     Importdata <- args[1] ###### file name : metrics table
@@ -54,10 +54,13 @@ if (colFactAna != "None")
 
 #factors <- fact.det.f(Obs=obs)
 
-vars_data<- NULL
-err_msg_data<-"The input metrics dataset doesn't have the right format. It needs to have at least the following 2 variables :\n- observation.unit (or year and site)\n- numeric or integer metric\n"
-check_file(obs,err_msg_data,vars_data,2)
+vars_data1<- NULL
+err_msg_data1<-"The input metrics dataset doesn't have the right format. It needs to have at least the following 2 variables :\n- observation.unit (or year and site)\n- numeric or integer metric\n"
+check_file(obs,err_msg_data1,vars_data1,2)
 
+vars_data2 <- c(listFact,listRand)
+err_msg_data2<-"The input unitobs dataset doesn't have the right format. It needs to have at least the following 2 variables :\n- observation.unit (or year and site)\n- factors used in GLM (habitat1, year and/or site)\n"
+check_file(tabUnitobs,err_msg_data2,vars_data2,2)
 
 ####################################################################################################
 ########## Computing Generalized Linear Model ## Function : modeleLineaireWP2.unitobs.f ############
@@ -107,6 +110,8 @@ modeleLineaireWP2.unitobs.f <- function(metrique, listFact, listRand, FactAna, D
     ##Creating analysis table :
     listFactTab <- c(listFact, FactAna)
     listFactTab <- listFactTab[listFactTab != "None"]
+
+    if (all(is.na(match(tmpData[,unitobs],tabUnitobs[,unitobs])))) {stop("Observation units doesn't match in the two input tables")}
 
     if(! is.element("species.code",colnames(tmpData)))
     {

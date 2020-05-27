@@ -2,7 +2,7 @@
 
 
 ##################################################################################################################################
-############## ?????????????????????????????????????????????????????????????????????????????????    ##############################
+####################### PAMPA Galaxy tools functions : Calculate metrics, compute GLM and plot   #################################
 ##################################################################################################################################
 
 #### Based on Romain Lorrillière R script
@@ -92,7 +92,7 @@ create.year.point <- function(data,year="year",point="point", unitobs="observati
 #Faut rentrer le nom du jeu de données, le nbre et le nom des variables / Enter dataset name,  expected number and names of variables. + an exit error message to guide user.
 
 check_file<-function(dataset,err_msg,vars,nb_vars){
-    if(ncol(dataset) <= nb_vars){ #Verifiction de la présence du bon nb de colonnes, si c'est pas le cas= message d'erreur / checking for right number of columns in the file if not = error message
+    if(ncol(dataset) < nb_vars){ #Verifiction de la présence du bon nb de colonnes, si c'est pas le cas= message d'erreur / checking for right number of columns in the file if not = error message
         cat("\nerr nb var\n") 
         stop(err_msg, call.=FALSE)
     }
@@ -1042,16 +1042,16 @@ sortiesLM.f <- function(objLM, formule, metrique, factAna, modSel, listFact, lis
  
 
         ## compMultiplesLM.f(objLM=objLM, Data=Data, factSpatial="protection.status", factTemp="year", resFile=resFile)
-#        compMultiplesLM.f(objLM=objLM, Data=Data, fact1=listFact[1], fact2=listFact[2],
- #                         resFile=resFile,Log=Log)
+        #compMultiplesLM.f(objLM=objLM, Data=Data, fact1=listFact[1], fact2=listFact[2],
+         #                 resFile=resFile,Log=Log)
 
         ## Représentation des interactions :suppr
         
     }else{
         if (length(listFact) == 1)
         {
-           # compSimplesLM.f(objLM=objLM, Data=Data, fact=listFact,
-            #                resFile=resFile, Log=Log)
+          #  compSimplesLM.f(objLM=objLM, Data=Data, fact=listFact,
+           #                 resFile=resFile, Log=Log)
         }else{}
     }
 
@@ -1162,12 +1162,8 @@ signifParamLM.f <- function(objLM, metrique, listFact, resFile)
         cat("\n",paste(varstd[c(grep("Groups",
                         varstd):grep("Number of obs",
                         varstd))], collapse="\n"),
-            #"\n",paste(varstd[grep(paste("^ ",paste(listFact,collapse="|")),varstd)][-1],
-             #          collapse="\n"),
             "\n",file=resFile,append=TRUE)    
- 
-        #cat("\nNumber of obs : ", sumLM$nobs,", groups : ",paste(sumLM$ngrps$cond,collapse=" ; "),
-         #   file=resFile,append=TRUE)
+
         ## Significativités des paramètres :
         cat("\n\n", "Parameter significances (fixed effects) :", #"\n(only the significant factors/interactions are shown):",
             "\n\n",
