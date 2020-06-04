@@ -14,7 +14,7 @@ suppressMessages(library(tidyr))
 args = commandArgs(trailingOnly=TRUE)
 #options(encoding = "UTF-8")
 
-if (length(args) < 3) {
+if (length(args) < 2) {
     stop("At least one argument must be supplied, an input dataset file (.tabular).", call.=FALSE) #si pas d'arguments -> affiche erreur et quitte / if no args -> error and exit1
 
 } else {
@@ -44,27 +44,22 @@ check_file(obs,err_msg_data,vars_data,3)
 calc.presAbs.f <- function(Data,
                            nbName="number")
 {
-    ## Purpose: Calcul des présences/absences à partir des abondances.
+    ## Purpose: Compute presence absence 
     ## ----------------------------------------------------------------------
-    ## Arguments: Data : la table de métrique (temporaire).
-    ##            nbName : nom de la colonne nombre.
+    ## Arguments: Data : temporary metrics table
+    ##            nbName : name of abundance column
     ##
-    ## Output: vecteur des présences/absences (0 ou 1).
+    ## Output: presence absence vector
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 20 déc. 2011, 12:04
+    ## Author: Yves Reecht, Date: 20 déc. 2011, 12:04 modified by Coline ROYAUX 04 june 2020
 
     ## Presence - absence :
     presAbs <- integer(nrow(Data))
-    presAbs[Data[ , nbName] > 0] <- as.integer(1) # pour avoir la richesse spécifique en 'integer'.1
-    presAbs[Data[ , nbName] == 0] <- as.integer(0) # pour avoir la richesse spécifique en 'integer'.0
+    presAbs[Data[ , nbName] > 0] <- as.integer(1) 
+    presAbs[Data[ , nbName] == 0] <- as.integer(0) 
 
     return(presAbs)
 }
-
-
-####################################################################################################
-################## create community metrics table ## Function : calcBiodiv.f #######################
-####################################################################################################
 
 
 ################# Analysis

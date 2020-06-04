@@ -41,20 +41,10 @@ metric <- colnames(obs)[colmetric]
 tabUnitobs <- read.table(ImportUnitobs,sep="\t",dec=".",header=TRUE,encoding="UTF-8")
 tabUnitobs[tabUnitobs == -999] <- NA 
 
-vars_data1<- c("species.code")
-err_msg_data1<-"The input metrics dataset doesn't have the right format. It needs to have at least the following 3 variables :\n- species.code \n- observation.unit (or year and site)\n- numeric or integer metric\n"
-check_file(obs,err_msg_data1,vars_data1,3)
-
-vars_data2 <- c(listFact,listRand)
-vars_data2 <- vars_data2[vars_data2 != "None"]
-err_msg_data2<-"The input unitobs dataset doesn't have the right format. It needs to have at least the following 2 variables :\n- observation.unit (or year and site)\n- factors used in GLM (habitat1, year and/or site)\n"
-check_file(tabUnitobs,err_msg_data2,vars_data2,2)
-
-
 if (colFactAna != "None")
 {
-    FactAna <- colFactAna
-    if (class(obs[FactAna]) == "numeric" || FactAna == "observation.unit"){stop("Wrong chosen separation factor : Analysis can't be separated by observation unit or numeric factor")}
+    FactAna <- colnames(tabUnitobs)[as.numeric(colFactAna)]
+    if (class(tabUnitobs[FactAna]) == "numeric" || FactAna == "observation.unit"){stop("Wrong chosen separation factor : Analysis can't be separated by observation unit or numeric factor")}
 }else{
     FactAna <- colFactAna
 }
@@ -62,13 +52,21 @@ if (colFactAna != "None")
 
 #factors <- fact.det.f(Obs=obs)
 
+vars_data1<- NULL
+err_msg_data1<-"The input metrics dataset doesn't have the right format. It needs to have at least the following 2 variables :\n- observation.unit (or year and site)\n- numeric or integer metric\n"
+check_file(obs,err_msg_data1,vars_data1,2)
+
+vars_data2 <- c(listFact,listRand)
+err_msg_data2<-"The input unitobs dataset doesn't have the right format. It needs to have at least the following 2 variables :\n- observation.unit (or year and site)\n- factors used in GLM (habitat1, year and/or site)\n"
+check_file(tabUnitobs,err_msg_data2,vars_data2,2)
+
 ####################################################################################################
 ########## Computing Generalized Linear Model ## Function : modeleLineaireWP2.unitobs.f ############
 ####################################################################################################
 
-modeleLineaireWP2.species.f <- function(metrique, listFact, listRand, FactAna, Distrib, log=FALSE, tabMetrics, tableMetrique, tabUnitobs, unitobs="observation.unit", nbName="number")
+modeleLineaireWP2.unitobs.f <- function(metrique, listFact, listRand, FactAna, Distrib, log=FALSE, tabMetrics, tableMetrique, tabUnitobs, unitobs="observation.unit", nbName="number")
 {
-    ## Purpose: Management of different stage of GLM per species
+    ## Purpose: Monitoring steps for GLM on unitobs
     ## ----------------------------------------------------------------------
     ## Arguments: metrique : selected metric
     ##            listFact : Factors for GLM
@@ -99,33 +97,35 @@ modeleLineaireWP2.species.f <- function(metrique, listFact, listRand, FactAna, D
 
         RespFact <- paste(listFact, collapse=" + ")
     }
+
     ##Creating model's expression :
+
     #if (log == FALSE) {
         exprML <- eval(parse(text=paste(metrique, "~", RespFact)))
     #}else{
-      #  exprML <- eval(parse(text=paste("log(",metrique,")", "~", RespFact)))
+     #   exprML <- eval(parse(text=paste("log(",metrique,")", "~", RespFact)))
     #}
 
     ##Creating analysis table :
-    listFactTab <- c(listFact,FactAna)
+
+    listFactTab <- c(listFact, FactAna)
     listFactTab <- listFactTab[listFactTab != "None"]
 
     if (all(is.na(match(tmpData[,unitobs],tabUnitobs[,unitobs])))) {stop("Observation units doesn't match in the two input tables")}
 
-    if(is.element("species.code",colnames(tmpData)))
+    if(! is.element("species.code",colnames(tmpData)))
     {
-        col <- c(unitobs,metrique,FactAna)
-        tmpData <- cbind(tmpData[,col], tabUnitobs[match(tmpData[,unitobs],tabUnitobs[,unitobs]),listFact])
-        colnames(tmpData) <- c(col,listFact)
+        col <- c(unitobs,metrique)
+        tmpData <- cbind(tmpData[,col], tabUnitobs[match(tmpData[,unitobs],tabUnitobs[,unitobs]),listFactTab])
+        colnames(tmpData) <- c(col,listFactTab)
 
         for (i in listFactTab) {
             switch(i,
                   "year"={tmpData[,"year"] <- as.integer(tmpData[,"year"])},
                   tmpData[,i] <- as.factor(tmpData[,i]))
-            
          }
     }else{
-        stop("Warning : wrong data frame, data frame should be aggregated by observation unit (year and site) and species")
+        stop("Warning : wrong data frame, data frame should be aggregated by observation unit (year and site)")
     }
 
     ## Suppress unsed 'levels' :
@@ -134,29 +134,32 @@ modeleLineaireWP2.species.f <- function(metrique, listFact, listRand, FactAna, D
     ## Automatic choice of distribution if none is selected by user :
     if (Distrib == "None") 
     {
-        if (metrique == "pres.abs") 
-        { 
-            loiChoisie <- "binomial"
-        }else{
-            switch(class(tmpData[,metrique]),
-                  "integer"={loiChoisie <- "poisson"},
-                  "numeric"={loiChoisie <- "gaussian"},
-                  stop("Selected metric class doesn't fit, you should select an integer or a numeric variable"))
-        }
+        switch(class(tmpData[,metrique]),
+              "integer"={loiChoisie <- "poisson"},
+              "numeric"={loiChoisie <- "gaussian"},
+              stop("Selected metric class doesn't fit, you should select an integer or a numeric variable"))
     }else{
         loiChoisie <- Distrib
     }
 
     ## Compute Model(s) :
+
+    if (FactAna != "None" && nlevels(tmpData[,FactAna]) > 1)
+    {
+        Anacut <- levels(tmpData[,FactAna])
+    }else{
+        Anacut <- NULL
+    }
+
     resFile <- "GLMSummary.txt"
     
-    for (sp in levels(tmpData[,FactAna])) 
+    for (cut in Anacut) 
     {
-        cutData <- tmpData[grep(sp,tmpData[,FactAna]),]
+        cutData <- tmpData[grep(cut,tmpData[,FactAna]),]
         cutData <- dropLevels.f(cutData)
 
         cat("--------------------------------------------------------------------------------\n",
-            "--------------------------------------------------------------------------------\n Analysis for species ",sp,
+            "--------------------------------------------------------------------------------\n Analysis for level ",cut,
             " :\n--------------------------------------------------------------------------------\n--------------------------------------------------------------------------------\n",
             sep="",file=resFile,append=TRUE)
 
@@ -169,7 +172,7 @@ modeleLineaireWP2.species.f <- function(metrique, listFact, listRand, FactAna, D
             res <- tryCatch(glm(exprML,data=cutData,family=loiChoisie), error=function(e){})
         }
 
-          ## Write results :      
+          ## Write results :
          if (! is.null(res))
          {
             sortiesLM.f(objLM=res, formule=exprML, metrique=metrique,
@@ -186,8 +189,32 @@ modeleLineaireWP2.species.f <- function(metrique, listFact, listRand, FactAna, D
 
     }
 
+    ## Global analysis : 
+
+
+    cat("--------------------------------------------------------------------------------\n",
+        "--------------------------------------------------------------------------------\n Global analysis",
+        " :\n--------------------------------------------------------------------------------\n--------------------------------------------------------------------------------\n",
+        sep="",file=resFile,append=TRUE)
+
+    if (listRand[1] != "None")
+    {
+        resG <- glmmTMB(exprML,family=loiChoisie, data=tmpData)
+    }else{
+        resG <- glm(exprML,data=tmpData,family=loiChoisie)
+    }
+
+    ## write results :
+    sortiesLM.f(objLM=resG, formule=exprML, metrique=metrique,
+                #factAna=factAna, modSel=iFactGraphSel, listFactSel=listFactSel,
+                listFact=listFact,
+                Data=tmpData, #Log=Log,
+                type=ifelse(tableMetrique == "unitSpSz" && factAna != "size.class",
+                            "CL_unitobs",
+                            "unitobs"))
+
 }
 
 ################# Analysis
 
-modeleLineaireWP2.species.f(metrique=metric, listFact=listFact, listRand=listRand, FactAna=FactAna, Distrib=Distrib, log=log, tabMetrics=obs, tableMetrique=aggreg, tabUnitobs=tabUnitobs, nbName="number")
+modeleLineaireWP2.unitobs.f(metrique=metric, listFact=listFact, listRand=listRand, FactAna=FactAna, Distrib=Distrib, log=log, tabMetrics=obs, tableMetrique=aggreg, tabUnitobs=tabUnitobs, nbName="number")

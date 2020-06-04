@@ -11,6 +11,11 @@
             <requirement type="package" version="1.4_13">r-multcomp</requirement>
         </requirements>    
     </xml>
+    <xml name="Plot_requirements">
+        <requirements>
+            <requirement type="package" version="3.1.1">r-ggplot2</requirement>
+        </requirements>    
+    </xml>
     <xml name="pampa_input_calculate">
         <param name="input" type="data" format="tabular" label="Input file" help="Observation data file, with location, year, species and abundance."/>
     </xml>
@@ -22,20 +27,13 @@
         <when value="simple">
         </when>        
     </xml>
-    <xml name="pampa_compute_????">
-        <param name="compute_???" type="boolean" truevalue="TRUE" falsevalue="FALSE" checked="yes" label="Compute ?????"/>
-    </xml>
-    <xml name="pampa_filter_????">
-        <filter> settings['advanced'] == 'advanced'</filter>
-        <filter> settings['method'] == '????'</filter>
-    </xml>
     <xml name="pampa_bibref">
         <citations>
             <citation type="bibtex">
-	    @unpublished{????,
+	    @unpublished{pampayves,
 	    title={ PAMPA "ressources et biodiversité" scripts },
             author={Yves Reecht},
-            url={??????}
+            url={https://wwz.ifremer.fr/pampa/Meth.-Outils/Outils}
             }
             </citation>
         </citations>

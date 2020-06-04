@@ -49,8 +49,8 @@ This tool from PAMPA toolsuite computes community metrics from abundance data.
 
 **Input description**
 
-A tabular file with observation data. Must at least contain three columns "observation.unit" 
-which associate year and location, "species.code" with species ID and "number" for abundance.
+A tabular file with observation data. Must at least contain three columns 'observation.unit'
+which associate year and location or 'year' and 'location', 'species.code' with species ID and 'number' for abundance.
 
 +------------------+--------------+------------+
 | observation.unit | species.code |   number   |
@@ -60,9 +60,19 @@ which associate year and location, "species.code" with species ID and "number" f
 |        ...       |      ...     |     ...    |
 +------------------+--------------+------------+
 
+OR
+
++------+----------+--------------+------------+
+| year | location | species.code |   number   |
++======+==========+==============+============+
+| 2000 |locationID|   speciesID  |      4     |
++------+----------+--------------+------------+
+|  ... |    ...   |      ...     |     ...    |
++------+----------+--------------+------------+
+
 The data frame may also contain : 
-- "size.class" field with 'G' representing big individuals in given species, 'M'middle-sized individuals and 'P' small individuals
-- "rotation" field for STAVIRO data
+- 'size.class' field with 'G' representing big individuals in given species, 'M' middle-sized individuals and 'P' small individuals
+- 'rotation' field for STAVIRO data
 
 |
 
@@ -74,7 +84,7 @@ A  tabular file with every metrics selected computed per observation unit
 
 **Source**
 
-Derived from PAMPA scripts (lien ?) written by Yves Reecht.
+Derived from PAMPA scripts (https://wwz.ifremer.fr/pampa/Meth.-Outils/Outils) written by Yves Reecht.
 
   ]]></help>
 

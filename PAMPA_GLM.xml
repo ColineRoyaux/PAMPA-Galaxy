@@ -1,4 +1,4 @@
-<tool id="pampa_glm" name="Compute GLM on community data" version="@VERSION@">
+<tool id="pampa_glmcomm" name="Compute GLM on community data" version="@VERSION@">
     <description>Compute a GLM of your choice on community data</description>
     <macros>
         <import>pampa_macros.xml</import>
@@ -6,7 +6,7 @@
     <expand macro="GLM_requirements"/>
     <command detect_errors="exit_code"><![CDATA[
         Rscript 
-         '$__tool_directory__/FunctExeCalcGLMGalaxy1.r' 
+         '$__tool_directory__/FunctExeCalcGLMGalaxy.r' 
          '$input_metric'
          '$input_unitobs'
          '$varint'
@@ -21,7 +21,6 @@
              'FALSE'
          #end if
          'unit'
-         'FALSE'
          '$__tool_directory__/FunctPAMPAGalaxy.r' 
          '$output_summary'
          '$output_recap'
@@ -59,8 +58,8 @@
         </conditional>
     </inputs>
     <outputs>
-        <data name="output_summary" from_work_dir="GLMSummary.txt" format="txt" label="GLM - Results from your Analysis"/>
-        <data name="output_recap" from_work_dir="GLMSummaryFull.txt" format="txt" label="Simple statistics on chosen variables"/>
+        <data name="output_summary" from_work_dir="GLMSummary.txt" format="txt" label="GLM - Results from your Analysis on ${on_string}"/>
+        <data name="output_recap" from_work_dir="GLMSummaryFull.txt" format="txt" label="Simple statistics on chosen variables on ${on_string}"/>
     </outputs>
     <tests>
         <test> 
@@ -68,9 +67,9 @@
         </test>
     </tests>
     <help><![CDATA[
-=============================================
-Compute GLM with selected interest variables
-=============================================
+==============================================================
+Compute GLM on community data with selected interest variables
+==============================================================
 
 **What it does**
 

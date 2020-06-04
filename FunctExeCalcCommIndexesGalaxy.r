@@ -45,12 +45,8 @@ check_file(obs,err_msg_data,vars_data,3)
 ####################################################################################################
 
 ########################################################################################################################
-calcBiodiv.f <- function(Data, 
-                         #refesp, 
-                         MPA, unitobs="observation.unit", code.especes="species.code", nombres="number",
-                         indices=index, global=FALSE, printInfo=FALSE
-                         #, dataEnv=.GlobalEnv
-                         )
+calcBiodiv.f <- function(Data, MPA, unitobs="observation.unit", code.especes="species.code", nombres="number",
+                         indices=index)
 {
     ## Purpose: calcul des indices de biodiversité
     ## ----------------------------------------------------------------------
@@ -66,22 +62,8 @@ calcBiodiv.f <- function(Data,
     ##            nombres : nom de la colone de nombres.
     ##            indices : liste des indices à calculer
     ##                      (vecteur de caractères)
-    ##            global : est-ce que les résultats doivent être exportés
-    ##                     globalement (booléen).
-    ##            printInfo : affichage des infos (chargement) ? (booléen).
-    ##            dataEnv : environnement des données
     ## ----------------------------------------------------------------------
     ## Author: Yves Reecht, Date: 29 oct. 2010, 08:58
-
-    ## Unitobs appartenant a l'AMP courante:
-    #unitobsData <- get("unitobs", envir=dataEnv)
-
-    #Data <- subset(Data,
-                   #is.element(Data[ , unitobs],
-                              #unitobsData[unitobsData[ , getOption("P.MPAfield")] == MPA ,
-                                          #unitobs]))
-
-    #DataTmp <- Data
 
     ## Supression de tout ce qui n'a pas d'espèce précisee (peut être du non biotique ou identification >= genre) :
 
@@ -90,16 +72,6 @@ calcBiodiv.f <- function(Data,
     {
         Data <- Data[-notspline, ]
     }else{}
-    
-    #NotSpecies <- c("Absencemacrofaune","NoID","Acrobranc","Acrodigit","Acroencr","Acrosubm","Acrotabu","Adredure","Adremoll","Algaturf","Balimona","Corablan","CoradurV","Coraenal","Coramou"," Dallcora","Debrcora","Debris","Hare","HexaChar","MuraCong","Nacrbran","Nacrcham","Nacrencr","Nacrfoli","Nacrmass","Nacrsubm","Recrcora","Roche","Sable","Vase")
-    
-
-    #if (! nrow(Data <- Data[(spTmp <- refesp$species[match(Data[ , code.especes], refesp$species.code)]) != "sp." &
-     #                       !is.na(spTmp), ]))
-    #{
-
-     #   return(Data)
-    #}else{}
 
     ## Suppression des niveaux de facteur inutilisés :
     Data <- dropLevels.f(df=Data)
@@ -110,7 +82,7 @@ calcBiodiv.f <- function(Data,
     {
         Data <- agregations.generic.f(Data=Data, metrics=nombres,
                                       factors=c(unitobs, code.especes),
-                                      listFact=NULL)#, dataEnv=dataEnv)
+                                      listFact=NULL)
     }else{}
 
     df.biodiv <- as.data.frame(as.table(tapply(Data[ , nombres],
@@ -138,7 +110,7 @@ calcBiodiv.f <- function(Data,
     matNombres[is.na(matNombres)] <- 0  # Vrais zéros
 
     ## Proportion d'individus de chaque espèce dans l'unitobs :
-    propIndiv <- sweep(matNombres, 1,                           #
+    propIndiv <- sweep(matNombres, 1,                           
                        apply(matNombres, 1, sum, na.rm = TRUE), # Nombre d'individus / unitobs ; équiv df.biodiv$nombre.
                        FUN="/")
 
@@ -166,17 +138,6 @@ calcBiodiv.f <- function(Data,
                                         # équiv df.biodiv$l.simpson / exp(df.biodiv$shannon)
     }
 
-    ## suppression de l'indice de shannon (non pertinent)
-    #df.biodiv$shannon <- NULL
-
-    ## ## On retablit les niveaux de facteurs:
-    ## colFact <- colnames(df.biodiv)[is.element(sapply(df.biodiv, class), "factor")]
-
-    ## for (col in colFact)
-    ## {
-    ##     levels(df.biodiv[ , colFact]) <- levels(DataTmp[ , colFact])
-    ## }
-
 
     return(df.biodiv)
 }
@@ -185,10 +146,8 @@ calcBiodiv.f <- function(Data,
 
 res <- calc.numbers.f(obs, ObsType=ObsType , factors=factors, nbName="number")
 
-tableCommunityIndexes <- calcBiodiv.f(res, #refesp, 
-                         MPA, unitobs="observation.unit", code.especes="species.code", nombres="number",
-                         indices=index, global=FALSE, printInfo=FALSE #, dataEnv=.GlobalEnv
-                         )
+tableCommunityIndexes <- calcBiodiv.f(res, MPA, unitobs="observation.unit", code.especes="species.code", nombres="number",
+                         indices=index)
 tableCommunityIndexes <- create.year.point(tableCommunityIndexes)
 #Save dataframe in a tabular format
 
