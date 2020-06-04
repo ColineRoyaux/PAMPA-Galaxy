@@ -944,16 +944,16 @@ sortiesLM.f <- function(objLM, formule, metrique, factAna, listFact, Data,
  
 
         ## compMultiplesLM.f(objLM=objLM, Data=Data, factSpatial="protection.status", factTemp="year", resFile=resFile)
-        #compMultiplesLM.f(objLM=objLM, Data=Data, fact1=listFact[1], fact2=listFact[2],
-         #                 resFile=resFile,Log=Log)
+        compMultiplesLM.f(objLM=objLM, Data=Data, fact1=listFact[1], fact2=listFact[2],
+                          resFile=resFile,Log=Log)
 
         ## Représentation des interactions :suppr
         
     }else{
         if (length(listFact) == 1)
         {
-          #  compSimplesLM.f(objLM=objLM, Data=Data, fact=listFact,
-           #                 resFile=resFile, Log=Log)
+            compSimplesLM.f(objLM=objLM, Data=Data, fact=listFact,
+                            resFile=resFile, Log=Log)
         }else{}
     }
 
