@@ -5,18 +5,8 @@
 ####################### PAMPA Galaxy tools functions : Calculate metrics, compute GLM and plot   #################################
 ##################################################################################################################################
 
-#### Based on Romain Lorrillière R script
-#### Modified by Alan Amosse and Benjamin Yguel for integrating within Galaxy-E
-
-##### workes with the R version 3.5.1 (2018-07-02)
-##### Package used with the version:
-#suppressMessages(library(lme4))  version 1.1.18.1
-#suppressMessages(library(ggplot2))  version 3.0.0
-#suppressMessages(library(speedglm))  version 0.3.2
-#suppressMessages(library(arm))  version 1.10.1
-#suppressMessages(library(reshape))  version 0.8.8
-#suppressMessages(library(data.table))  version 1.12.0
-#suppressMessages(library(reshape2))   version 1.4.3
+#### Based on Yves Reecht R script
+#### Modified by Coline ROYAUX for integrating within Galaxy-E
 
 ######################################### start of the function fact.def.f called by FunctExeCalcCommIndexesGalaxy.r and FunctExeCalcPresAbsGalaxy.r
 ####### Define the finest aggregation with the observation table
@@ -56,11 +46,13 @@ def.typeobs.f <- function(Obs)
 ####### Create unitobs column when inexistant
 create.unitobs <- function(data,year="year",point="point", unitobs="observation.unit")
 {
-    if (!is.element("observation.unit",colnames(data)))
+    if (is.element(paste(unitobs),colnames(data)) && all(grepl("[1-2][0|8|9][0-9]{2}_.*",data[,unitobs])==FALSE))
     {
-        unitab <- unite(data,col="observation.unit",c(year,point))
-    }else{ 
         unitab <- data
+
+    }else{ 
+
+        unitab <- unite(data,col="observation.unit",c(year,point))
     }
     return(unitab)
 }
@@ -87,18 +79,26 @@ create.year.point <- function(data,year="year",point="point", unitobs="observati
 
 ######################################### start of the function check_file called by every Galaxy Rscripts
 
-# Fonction pour verifier les données d'entrée / General function to check integrity of input file. Will check numbers and contents of variables(colnames). 
-#return an error message and exit if mismatch detected
-#Faut rentrer le nom du jeu de données, le nbre et le nom des variables / Enter dataset name,  expected number and names of variables. + an exit error message to guide user.
-
 check_file<-function(dataset,err_msg,vars,nb_vars){
-    if(ncol(dataset) < nb_vars){ #Verifiction de la présence du bon nb de colonnes, si c'est pas le cas= message d'erreur / checking for right number of columns in the file if not = error message
+
+    ## Purpose: General function to check integrity of input file. Will 
+    ##          check numbers and contents of variables(colnames).
+    ##          return an error message and exit if mismatch detected
+    ## ----------------------------------------------------------------------
+    ## Arguments: dataset : dataset name
+    ##            err_msg : output error
+    ##            vars : expected name of variables
+    ##            nb_vars : expected number of variables
+    ## ----------------------------------------------------------------------
+    ## Author: Alan Amosse, Benjamin Yguel 
+
+    if(ncol(dataset) < nb_vars){ #checking for right number of columns in the file if not = error message
         cat("\nerr nb var\n") 
         stop(err_msg, call.=FALSE)
     }
 
     for(i in vars){
-        if(!(i %in% names(dataset))){
+        if(!(i %in% names(dataset))){ #checking colnames
             stop(err_msg,call.=FALSE)
         }
     }
@@ -111,39 +111,36 @@ check_file<-function(dataset,err_msg,vars,nb_vars){
 
 statRotationsNumber.f <- function(factors, obs)
 {
-    ## Purpose: Calcul des statistiques des abondances (max, sd) par rotation
-    ##          en se basant sur des données déjà interpolées.
+    ## Purpose: Computing abundance statistics by rotation (max, sd) 
+    ##          on SVR data
     ## ----------------------------------------------------------------------
-    ## Arguments: factors : vecteur des noms de factors d'agrégation
-    ##                       (résolution à laquelle on travaille).
-    ##            obs : données d'observation.
-    ##            dataEnv : environnement des données (pour sauvegarde de
-    ##                      résultats intermédiaires).
+    ## Arguments: factors : Names of aggregation factors
+    ##            obs : observation data
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 29 oct. 2012, 16:01
+    ## Author: Yves Reecht, Date: 29 oct. 2012, 16:01 modified by Coline ROYAUX 04 june 2020
 
-    ## Identification des rotations valides :
+    ## Identification of valid rotations :
     if (is.element("observation.unit", factors))
     {
-        ## Rotations valides (les vides doivent tout de même être renseignés) :
+        ## valid rotations (empty must be there as well) :
         rotations <- tapply(obs$rotation,
                             as.list(obs[ , c("observation.unit", "rotation"), drop=FALSE]),
                             function(x)length(x) > 0)
 
-        ## Les rotations non renseignés apparaissent en NA et on veut FALSE :
+        ## Changing NA rotations in FALSE :
         rotations[is.na(rotations)] <- FALSE
     }else{
         #stop(mltext("statRotations.err.1"))
     }
 
     ## ###########################################################
-    ## Nombres par rotation avec le niveau d'agrégation souhaité :
+    ## Abundance per rotation at chosen aggregation factors :
     nombresR <- tapply(obs$number,
                        as.list(obs[ , c(factors, "rotation"), drop=FALSE]),
                        function(x,...){ifelse(all(is.na(x)), NA, sum(x,...))},
                        na.rm = TRUE)
 
-    ## Les NAs sont considérés comme des vrais zéros lorsque la rotation est valide :
+    ## If valid rotation NA are considered 0 :
     nombresR <- sweep(nombresR,
                       match(names(dimnames(rotations)), names(dimnames(nombresR)), nomatch=NULL),
                       rotations,        # Tableau des secteurs valides (booléens).
@@ -154,9 +151,9 @@ statRotationsNumber.f <- function(factors, obs)
                   })
 
     ## ##################################################
-    ## Statistiques :
+    ## Statistics :
 
-    ## Moyennes :
+    ## Means :
     nombresMean <- apply(nombresR, which(is.element(names(dimnames(nombresR)), factors)),
                          function(x,...){ifelse(all(is.na(x)), NA, mean(x,...))}, na.rm=TRUE)
 
@@ -164,14 +161,14 @@ statRotationsNumber.f <- function(factors, obs)
     nombresMax <- apply(nombresR, which(is.element(names(dimnames(nombresR)), factors)),
                         function(x,...){ifelse(all(is.na(x)), NA, max(x,...))}, na.rm=TRUE)
 
-    ## Déviation standard :
+    ## SD :
     nombresSD <- apply(nombresR, which(is.element(names(dimnames(nombresR)), factors)),
                        function(x,...){ifelse(all(is.na(x)), NA, sd(x,...))}, na.rm=TRUE)
 
-    ## Nombre de rotations valides :
+    ## Valid rotations count :
     nombresRotations <- apply(rotations, 1, sum, na.rm=TRUE)
 
-    ## Retour des résultats sous forme de liste :
+    ## Results returned as list :
     return(list(nombresMean=nombresMean, nombresMax=nombresMax, nombresSD=nombresSD,
                 nombresRotations=nombresRotations, nombresTot=nombresR))
 }
@@ -179,27 +176,27 @@ statRotationsNumber.f <- function(factors, obs)
 ######################################### end of the function statRotationsNumber.f 
 
 ######################################### start of the function calcNumber.default.f called by calc.numbers.f
-## Calcul des nombres au niveau d'agrégation le plus fin.
 
 calcNumber.default.f <- function(obs,
                                  factors=c("observation.unit", "species.code", "size.class"),
                                  nbName="number")
 {
-    ## Arguments: obs : table des observations (data.frame).
-    ##            factors : les factors d'agrégation.
-    ##            nbName : nom de la colonne nombre.
+    ## Purpose : Compute abundances at finest aggregation 
+    ## ---------------------------------------------------------------------
+    ## Arguments: obs : observation table
+    ##            factors : aggregation factors
+    ##            nbName : name of abundance column.
     ##
-    ## Output: un array avec autant de dimensions que de factors
-    ##         d'agrégation.
+    ## Output: array with ndimensions = nfactors.
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 19 déc. 2011, 13:38
+    ## Author: Yves Reecht, Date: 19 déc. 2011, 13:38 modified by Coline ROYAUX 04 june 2020
 
-    ## Somme des nombres d'individus :
+    ## Sum individuals number :
     nbr <- tapply(obs[ , nbName],
                   as.list(obs[ , factors]),
                   sum, na.rm = TRUE)
 
-    ## Absences considérée comme "vrais zéros" :
+    ## Absences as "true zero" :
     nbr[is.na(nbr)] <- 0
 
     return(nbr)
@@ -211,25 +208,24 @@ calcNumber.default.f <- function(obs,
 
 calc.numbers.f <- function(obs, ObsType="", factors=c("observation.unit", "species.code", "size.class"), nbName="number")
 {
-    ## Purpose: Produit la data.frame qui va servir de table, à partir du
-    ##          tableau de nombres produit par calcNumber.default.f().
+    ## Purpose: Produce data.frame used as table from output of calcNumber.default.f().
     ## ----------------------------------------------------------------------
-    ## Arguments: nbr : array de nombres avec autant de dimensions que de
-    ##                  factors d'agrégations.
-    ##            nbName : nom de la colonne nombre.
+    ## Arguments: obs : observation table
+    ##            ObsType : Type of observation (SVR, LIT, ...)
+    ##            factors : aggregation factors
+    ##            nbName : name of abundance column
     ##
-    ## Output: une data.frame avec (nombre de factors d'agrégation + 1)
-    ##         colonnes.
+    ## Output: data.frame with (N aggregation factors + 1) columns
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 19 déc. 2011, 13:46
+    ## Author: Yves Reecht, Date: 19 déc. 2011, 13:46 modified by Coline ROYAUX 04 june 2020
 
     if (ObsType == "SVR")
     {
-         ## Calcul des statistiques de nombres :
+         ## Compute SVR abundances statistics :
          statRotations <- statRotationsNumber.f(factors=factors,
                                                   obs=obs)
 
-         ## Moyenne pour les vidéos rotatives (habituellement 3 rotation) :
+         ## Mean for rotating videos (3 rotations at most times) :
          nbr <- statRotations[["nombresMean"]]
 
     }else{
@@ -238,14 +234,13 @@ calc.numbers.f <- function(obs, ObsType="", factors=c("observation.unit", "speci
     }
 
     res <- as.data.frame(as.table(nbr), responseName=nbName)
-    ## res$unitobs <- res$observation.unit # Pour compatibilité uniquement !!!
 
     if (is.element("size.class", colnames(res)))
     {
         res$size.class[res$size.class == ""] <- NA
     }else{}
 
-    ## Si les nombres sont des entiers, leur redonner la bonne classe :
+    ## If integer abundances :
     if (isTRUE(all.equal(res[ , nbName], as.integer(res[ , nbName]))))
     {
         res[ , nbName] <- as.integer(res[ , nbName])
@@ -253,7 +248,7 @@ calc.numbers.f <- function(obs, ObsType="", factors=c("observation.unit", "speci
 
     if (ObsType == "SVR")
     {
-        ## Statistiques sur les nombres :
+        ## statistics on abundances :
         res$number.max <- as.vector(statRotations[["nombresMax"]])
         res$number.sd <- as.vector(statRotations[["nombresSD"]])
               
@@ -268,13 +263,12 @@ calc.numbers.f <- function(obs, ObsType="", factors=c("observation.unit", "speci
 
 presAbs.f <- function(nombres, logical=FALSE)
 {
-    ## Purpose: Renvoie les présences/absences d'après les nombres.
+    ## Purpose: Compute presence absence from abundances
     ## ----------------------------------------------------------------------
-    ## Arguments: nombres : vecteur de nombre d'individus.
-    ##            logical : faut-il renvoyer les résultats sous forme de
-    ##                      booléens, ou 0/1 (booléen).
+    ## Arguments: nombres : vector of individuals count.
+    ##            logical : (boolean) results as boolean or 0/1 ?
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 29 oct. 2010, 10:20
+    ## Author: Yves Reecht, Date: 29 oct. 2010, 10:20 modified by Coline ROYAUX 04 june 2020
 
     if (any(nombres < 0, na.rm=TRUE))
     {
@@ -296,17 +290,13 @@ presAbs.f <- function(nombres, logical=FALSE)
 
 betterCbind <- function(..., dfList=NULL, deparse.level = 1)
 {
-    ## Purpose: Appliquer un cbind à des data.frames qui ont des colonnes
-    ##          communes en supprimant les redondances (comme un merge mais
-    ##          les lignes doivent être en mêmes nombres et
-    ##          dans le même ordre)
+    ## Purpose: Apply cbind to data frame with mathcing columns but without
+    ##          redundancies.
     ## ----------------------------------------------------------------------
-    ## Arguments: ceux de cbind...
-    ##            dfList : une liste de data.frames (evite un do.call
-    ##                     supplémentaire).
-    ##                     ... est utilisé à la place si NULL.
+    ## Arguments: same as cbind...
+    ##            dfList : data.frames list
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 17 janv. 2012, 21:10
+    ## Author: Yves Reecht, Date: 17 janv. 2012, 21:10 modified by Coline ROYAUX 04 june 2020
 
     if (is.null(dfList))
     {
@@ -331,20 +321,19 @@ betterCbind <- function(..., dfList=NULL, deparse.level = 1)
 
 ######################################### start of the function agregation.f called by agregations.generic.f
 
-agregation.f <- function(metric, Data, factors, casMetrique, dataEnv,
+agregation.f <- function(metric, Data, factors, casMetrique,
                          nbName="number")
 {
-    ## Purpose: Agrégation d'une métrique.
+    ## Purpose: metric aggregation
     ## ----------------------------------------------------------------------
-    ## Arguments: metric: nom de la colonne de la métrique.
-    ##            Data: table de données non-agrégées.
-    ##            factors: vecteur des noms de factors d'agrégation.
-    ##            casMetrique: vecteur nommé des types d'observation en
-    ##                         fonction de la métrique choisie.
-    ##            dataEnv: environnement des données.
-    ##            nbName : nom de la colonne nombre.
+    ## Arguments: metric: colnames of chosen metric
+    ##            Data: Unaggregated data table
+    ##            factors: aggregation factors vector
+    ##            casMetrique: named vector of observation types depending
+    ##                         on chosen metric
+    ##            nbName : abundance column name
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 20 déc. 2011, 14:29
+    ## Author: Yves Reecht, Date: 20 déc. 2011, 14:29 modified by Coline ROYAUX 04 june 2020
 
     switch(casMetrique[metric],
            "sum"={
@@ -392,8 +381,8 @@ agregation.f <- function(metric, Data, factors, casMetrique, dataEnv,
                                            0,
                                            (sum(Data[ii, nbName][ !is.na(Data[ii, metric])], na.rm=TRUE) /
                                             sum(Data[ii, "nombre.tot"], na.rm=TRUE)) *
-                                           ## Correction si la classe de taille n'est pas un facteur d'agrégation
-                                           ## (sinon valeur divisée par le nombre de classes présentes) :
+                                           ## Correction if size class isn't an aggregation factor
+                                           ## (otherwise value divided by number of present classes) :
                                            ifelse(is.element("size.class", factors),
                                                   100,
                                                   100 * length(unique(Data$size.class)))))
@@ -411,8 +400,8 @@ agregation.f <- function(metric, Data, factors, casMetrique, dataEnv,
                                            0,
                                            (sum(Data[ii, "biomass"][ !is.na(Data[ii, metric])], na.rm=TRUE) /
                                             sum(Data[ii, "tot.biomass"], na.rm=TRUE)) *
-                                           ## Correction si la classe de taille n'est pas un facteur d'agrégation
-                                           ## (sinon valeur divisée par le nombre de classes présentes) :
+                                           ## Correction if size class isn't an aggregation factor
+                                           ## (otherwise value divided by number of present classes) :
                                            ifelse(is.element("size.class", factors),
                                                   100,
                                                   100 * length(unique(Data$size.class)))))
@@ -424,18 +413,18 @@ agregation.f <- function(metric, Data, factors, casMetrique, dataEnv,
                              as.list(Data[ , factors, drop=FALSE]),
                              function(x)
                          {
-                             ifelse(all(is.na(x)), # Cas où il n'y a que des NAs.
+                             ifelse(all(is.na(x)), # When only NAs.
                                     NA,
-                                    ifelse(any(x > 0, na.rm=TRUE), # Sinon...
-                                           1, # ...présence si au moins une observation dans le groupe.
+                                    ifelse(any(x > 0, na.rm=TRUE), # Otherwise...
+                                           1, # ... presence if at least one observation in the group.
                                            0))
                          })
            },
            "nbMax"={
-               ## Récupération des nombres brutes avec sélections :
-               nbTmp <- getReducedSVRdata.f(dataName=".NombresSVR", data=Data, dataEnv=dataEnv)
+               ## Recuperation of raw abundances with selections :
+               nbTmp <- getReducedSVRdata.f(dataName=".NombresSVR", data=Data)
 
-               ## Somme par croisement de facteur / rotation :
+              ## Sum by factor cross / rotation :
                nbTmp2 <- apply(nbTmp,
                              which(is.element(names(dimnames(nbTmp)), c(factors, "rotation"))),
                              function(x)
@@ -443,7 +432,7 @@ agregation.f <- function(metric, Data, factors, casMetrique, dataEnv,
                              ifelse(all(is.na(x)), NA, sum(x, na.rm=TRUE))
                          })
 
-               ## Somme par croisement de facteur :
+               ## Sum by factor cross :
                res <- as.array(apply(nbTmp2,
                                      which(is.element(names(dimnames(nbTmp)), factors)),
                                      function(x)
@@ -452,10 +441,10 @@ agregation.f <- function(metric, Data, factors, casMetrique, dataEnv,
                                  }))
            },
            "nbSD"={
-               ## Récupération des nombres brutes avec sélections :
-               nbTmp <- getReducedSVRdata.f(dataName=".NombresSVR", data=Data, dataEnv=dataEnv)
+               ## Recuperation of raw abundances with selections :
+               nbTmp <- getReducedSVRdata.f(dataName=".NombresSVR", data=Data)
 
-               ## Somme par croisement de facteur / rotation :
+               ## Sum by factor cross / rotation :
                nbTmp2 <- apply(nbTmp,
                              which(is.element(names(dimnames(nbTmp)), c(factors, "rotation"))),
                              function(x)
@@ -463,7 +452,7 @@ agregation.f <- function(metric, Data, factors, casMetrique, dataEnv,
                              ifelse(all(is.na(x)), NA, sum(x, na.rm=TRUE))
                          })
 
-               ## Somme par croisement de facteur :
+               ## Sum by factor cross :
                res <- as.array(apply(nbTmp2,
                                      which(is.element(names(dimnames(nbTmp)), factors)),
                                      function(x)
@@ -472,10 +461,10 @@ agregation.f <- function(metric, Data, factors, casMetrique, dataEnv,
                                  }))
            },
            "densMax"={
-               ## Récupération des nombres brutes avec sélections :
-               densTmp <- getReducedSVRdata.f(dataName=".DensitesSVR", data=Data, dataEnv=dataEnv)
+               ## Recuperation of raw abundances with selections :
+               densTmp <- getReducedSVRdata.f(dataName=".DensitesSVR", data=Data)
 
-               ## Somme par croisement de facteur / rotation :
+               ## Sum by factor cross / rotation :
                densTmp2 <- apply(densTmp,
                                  which(is.element(names(dimnames(densTmp)), c(factors, "rotation"))),
                                  function(x)
@@ -483,7 +472,7 @@ agregation.f <- function(metric, Data, factors, casMetrique, dataEnv,
                                  ifelse(all(is.na(x)), NA, sum(x, na.rm=TRUE))
                              })
 
-               ## Somme par croisement de facteur :
+               ## Sum by factor cross :
                res <- as.array(apply(densTmp2,
                                      which(is.element(names(dimnames(densTmp)), factors)),
                                      function(x)
@@ -492,10 +481,10 @@ agregation.f <- function(metric, Data, factors, casMetrique, dataEnv,
                                  }))
            },
            "densSD"={
-               ## Récupération des nombres brutes avec sélections :
-               densTmp <- getReducedSVRdata.f(dataName=".DensitesSVR", data=Data, dataEnv=dataEnv)
+               ## Recuperation of raw abundances with selections :
+               densTmp <- getReducedSVRdata.f(dataName=".DensitesSVR", data=Data)
 
-               ## Somme par croisement de facteur / rotation :
+               ## Sum by factor cross / rotation :
                densTmp2 <- apply(densTmp,
                                  which(is.element(names(dimnames(densTmp)), c(factors, "rotation"))),
                                  function(x)
@@ -503,7 +492,7 @@ agregation.f <- function(metric, Data, factors, casMetrique, dataEnv,
                                  ifelse(all(is.na(x)), NA, sum(x, na.rm=TRUE))
                              })
 
-               ## Somme par croisement de facteur :
+               ## Sum by factor cross :
                res <- as.array(apply(densTmp2,
                                      which(is.element(names(dimnames(densTmp)), factors)),
                                      function(x)
@@ -526,12 +515,12 @@ agregation.f <- function(metric, Data, factors, casMetrique, dataEnv,
            stop("Not implemented!")
            )
 
-    ## Nom des dimensions
+    ## dimension names
     names(dimnames(res)) <- c(factors)
 
-    ## Transformation vers format long :
+    ## Transformation to long format :
     reslong <- as.data.frame(as.table(res), responseName=metric)
-    reslong <- reslong[ , c(tail(colnames(reslong), 1), head(colnames(reslong), -1))] # métrique en première.
+    reslong <- reslong[ , c(tail(colnames(reslong), 1), head(colnames(reslong), -1))] # metric first
 
     return(reslong)
 }
@@ -540,29 +529,24 @@ agregation.f <- function(metric, Data, factors, casMetrique, dataEnv,
 
 ######################################### start of the function agregations.generic.f called y calcBiodiv.f in FucntExeCalcCommIndexesGalaxy.r
 
-agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpSz=NULL, unitSp=NULL, info=FALSE,
-                                  dataEnv=.GlobalEnv, nbName="number")
+agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpSz=NULL, unitSp=NULL,
+                                  nbName="number")
 {
-    ## Purpose: Agréger les données selon un ou plusieurs factors.
+    ## Purpose: Aggregate data 
     ## ----------------------------------------------------------------------
-    ## Arguments: Data : Le jeu de données à agréger.
-    ##            metrics : la métrique agrégée.
-    ##            factors : les factors
-    ##            listFact : noms des factors supplémentaires (agrégés et
-    ##                       ajoutés à la table de sortie).
-    ##            unitSpSz : Table de métriques par unitobs/esp/CT.
-    ##            unitSp : Table de métriques par unitobs/esp
-    ##            info : affichage des infos ?
-    ##            nbName : nom de la colonne nombre.
+    ## Arguments: Data : data set
+    ##            metrics : aggregated metric
+    ##            factors : aggregation factors
+    ##            listFact : other factors to aggregate and add to output
+    ##            unitSpSz : Metrics table by unitobs/species/Size Class
+    ##            unitSp : Metrics table by unitobs/species
+    ##            nbName : abundance colname
     ##
-    ## Output : une data.frame agrégée.
+    ## Output : aggregated data frame
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 18 oct. 2010, 15:47
+    ## Author: Yves Reecht, Date: 18 oct. 2010, 15:47 modified by Coline ROYAUX 04 june 2020
 
-    ## Informations (l'étape peut être longue) :
-    #if (info) WinInfo <- agregation.info.f()
-
-    ## traitements selon le type de métrique :
+    ## trt depending on metric type :
     casMetrique <- c("number"="sum",
                      "mean.length"="w.mean",
                      "taille_moy"="w.mean",
@@ -575,8 +559,8 @@ agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpS
                      "CPUE"="sum",
                      "CPUE.biomass"="sum",
                      "pres.abs"="pres",
-                     "abundance.prop.SC"="w.mean.prop", # Pas bon [!!!] ?
-                     "biomass.prop.SC"="w.mean.prop.bio",  # Pas bon [!!!] ?
+                     "abundance.prop.SC"="w.mean.prop", # Not OK [!!!] ?
+                     "biomass.prop.SC"="w.mean.prop.bio",  # Not OK [!!!] ?
                      ## Benthos :
                      "colonies"="sum",
                      "coverage"="sum",
@@ -592,7 +576,7 @@ agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpS
                      "readable.tracks"="sum",
                      "tracks.number"="sum")
 
-    ## Ajout de "readable.tracks" pour le pourcentage de ponte :
+    ## add "readable.tracks" for egg laying percentage :
     if (any(casMetrique[metrics] == "%.nesting"))
     {
         if (is.element("size.class", colnames(Data)))
@@ -613,7 +597,7 @@ agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpS
         }
     }else{}
 
-    ## Ajout du champ nombre pour le calcul des moyennes pondérées s'il est absent :
+    ## Add "number" field for computing ponderate means if absent :
     if (any(casMetrique[metrics] == "w.mean" | casMetrique[metrics] == "w.mean.prop"))
     {
         if (is.element("size.class", colnames(Data)))
@@ -625,7 +609,7 @@ agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpS
                           by=c("species.code", "observation.unit", "size.class"),
                           suffixes=c("", ".y"))
 
-            ## Ajout de l'abondance totale /espèce/unité d'observation :
+            ## add tot abundance / species / observation unit :
             nbTot <- tapply(unitSpSz[ , nbName],
                             as.list(unitSpSz[ , c("species.code", "observation.unit")]),
                             sum, na.rm=TRUE)
@@ -642,7 +626,7 @@ agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpS
         }
     }else{}
 
-    ## Ajout du champ biomasse pour les proportions de biomasses par classe de taille :
+    ## Add biomass field of biomass proportion by size class :
     if (any(casMetrique[metrics] == "w.mean.prop.bio"))
     {
         if (is.null(unitSpSz)) stop("unitSpSz doit être défini")
@@ -652,7 +636,7 @@ agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpS
                       by=c("species.code", "observation.unit", "size.class"),
                       suffixes=c("", ".y"))
 
-        ## Ajout de la biomasse totale /espèce/unité d'observation :
+        ## add tot biomass / species / observation unit :
         biomTot <- tapply(unitSpSz$biomass,
                           as.list(unitSpSz[ , c("species.code", "observation.unit")]),
                           function(x)
@@ -666,7 +650,7 @@ agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpS
                       as.data.frame(as.table(biomTot), responseName="tot.biomass"))
     }
 
-    ## Ajout du champ colonie pour le calcul des moyennes pondérées s'il est absent :
+    ## add colony field for ponderate means pondérées if absent :
     if (any(casMetrique[metrics] == "w.mean.colonies" & ! is.element("colonies", colnames(Data))))
     {
         Data$colonies <- unitSp[match(apply(Data[ , c("species.code", "observation.unit")],
@@ -676,13 +660,13 @@ agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpS
     }else{}
 
 
-    ## Agrégation de la métrique selon les factors :
-    reslong <- betterCbind(dfList=lapply(metrics,   # sapply utilisé pour avoir les noms.
+    ## Aggregation of metric depending on factors :
+    reslong <- betterCbind(dfList=lapply(metrics,   # sapply used to have names
                                          agregation.f,
-                                         Data=Data, factors=factors, casMetrique=casMetrique, dataEnv=dataEnv,
+                                         Data=Data, factors=factors, casMetrique=casMetrique,
                                          nbName=nbName))
 
-    ## Agrégation et ajout des factors supplémentaires :
+    ## Aggregation and add other factors :
     if ( ! (is.null(listFact) || length(listFact) == 0))
     {
         reslong <- cbind(reslong,
@@ -693,10 +677,9 @@ agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpS
                                        as.list(Data[ , factors, drop=FALSE]),
                                        function(x)
                                    {
-                                       if (length(x) > 1 && length(unique(x)) > 1) # On doit n'avoir qu'une seule
-                                        # modalité...
+                                       if (length(x) > 1 && length(unique(x)) > 1) # must be one modality
                                        {
-                                           return(NULL)                  # ...sinon on retourne NULL
+                                           return(NULL)                  # otherwise it is NULL
                                        }else{
                                            unique(as.character(x))
                                        }
@@ -704,7 +687,7 @@ agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpS
                             }))
     }else{}
 
-    ## Si certains factors ne sont pas de classe facteur, il faut les remettre dans leur classe d'origine :
+    ## If some factors aren't at the right class :
     if (any(tmp <- sapply(reslong[ , listFact, drop=FALSE], class) != sapply(Data[ , listFact, drop=FALSE], class)))
     {
         for (i in which(tmp))
@@ -722,7 +705,7 @@ agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpS
         }
     }else{}
 
-    ## Rétablir l'ordre initial des nivaux de factors :
+    ## Initial order of factors levels :
     reslong <- as.data.frame(sapply(colnames(reslong),
                                     function(x)
                                 {
@@ -735,12 +718,7 @@ agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpS
                                 }, simplify=FALSE))
 
 
-    ## Fermeture de la fenêtre d'information
-    if (info) close.info.f(WinInfo)
-
-    ## Vérification des factors supplémentaires agrégés. Il ne doit pas y avoir d'élément nul (la fonction précédente
-    ## renvoie NULL si plusieurs niveaux de factors, i.e. le facteur est un sous ensemble d'un des factors
-    ## d'agrégation des observations) :
+    ## Check of other aggregated factors supplémentaires. There must be no NULL elements :
     if (any(sapply(reslong[ , listFact], function(x){any(is.null(unlist(x)))})))
     {
         warning(paste("One of the suppl. factors is probably a subset",
@@ -756,13 +734,12 @@ agregations.generic.f <- function(Data, metrics, factors, listFact=NULL, unitSpS
 ######################################### start of the function dropLevels.f called y calcBiodiv.f in FucntExeCalcCommIndexesGalaxy.r and modeleLineaireWP2.unitobs.f in FunctExeCalcGLMGalaxy.r
 dropLevels.f <- function(df, which=NULL)
 {
-    ## Purpose: Supprimer les 'levels' non utilisés des factors d'une
-    ##          data.frame.
+    ## Purpose: Suppress unused levels of factors
     ## ----------------------------------------------------------------------
-    ## Arguments: df : une data.frame
-    ##            which : indice des colonnes à inclure (toutes par défaut).
+    ## Arguments: df : a data.frame
+    ##            which : included columns index (all by default)
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 10 août 2010, 13:29
+    ## Author: Yves Reecht, Date: 10 août 2010, 13:29 modified by Coline ROYAUX 04 june 2020
 
     if (class(df) != "data.frame")
     {
@@ -775,7 +752,7 @@ dropLevels.f <- function(df, which=NULL)
                                       return(x[ ,drop=TRUE])
                                   }, simplify=FALSE),
                                stringsAsFactors=FALSE)
-        }else{                          # Cas où seulement certaines colonnes sont traitées.
+        }else{                          # Only some columns used
             x <- df
 
             x[ , which] <- as.data.frame(sapply(df[ , which, drop=FALSE],
@@ -797,25 +774,18 @@ subsetToutesTables.f <- function(metrique, tabMetrics, facteurs, selections,
                                  tabUnitobs, refesp, tableMetrique="", nbName="number", ObsType = "",
                                  exclude=NULL, add=c("species.code", "observation.unit"))
 {
-    ## Purpose: Extraire les données utiles uniquement, d'après les métrique
-    ##          et facteur(s) séléctionnés, ainsi que leur(s) sélection(s) de
-    ##          modalité(s).
+    ## Purpose: Extract useful data only from chosen metrics and factors
     ## ----------------------------------------------------------------------
-    ## Arguments: metrique : la métrique choisie.
-    ##            facteurs : les facteurs sélectionnés (tous)
-    ##            selections : les sélections de modalités correspondantes
-    ##                         (liste).
-    ##            tableMetrique : le nom de la table des métriques.
-    ##            exclude : niveau de facteur à ne pas prendre en compte pour
-    ##                      le subset.
-    ##            add : champ(s) (de la table de métrique) à ajouter aux
-    ##                  données.
-    ##            dataEnv : l'environnement des données.
+    ## Arguments: metrique : chosen metric
+    ##            facteurs : all chosen factors
+    ##            selections : corresponding modality selected 
+    ##            tableMetrique : metrics table name
+    ##            exclude : factors levels to exclude
+    ##            add : field to add to data table
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date:  6 août 2010, 16:46
+    ## Author: Yves Reecht, Date:  6 août 2010, 16:46 modified by Coline ROYAUX 04 june 2020
 
-    ## Si pas de table de métrique disponible ou déjà calculée
-    ## ("TableOcurrences" est calculée à partir de la sélection) :
+    ## If no metrics table available :
     if (is.element(tableMetrique, c("", "TableOccurrences", "TablePresAbs")))
     {
         tableMetrique <- "unitSp"
@@ -825,12 +795,12 @@ subsetToutesTables.f <- function(metrique, tabMetrics, facteurs, selections,
                    "TablePresAbs"="unitSp",
                    "unitSpSz"="unitSpSz")
 
-    ## Récupération de la table de métriques :
+    ## Recuperation of metrics table :
     dataMetrique <- tabMetrics
     unitobs <- tabUnitobs
     refesp <- refesp
 
-    ## Si pas de métrique disponible ou déjà calculée ("freq.occurrence" est calculée à partir de la sélection) :
+    ## If no metrics available or already computed :
     if (is.element(metrique, c("", "occurrence.frequency")))
     {
         metrique <- "tmp"
@@ -845,9 +815,9 @@ subsetToutesTables.f <- function(metrique, tabMetrics, facteurs, selections,
         metriques <- metrique
     }
 
-    ## Subset en fonction de la table de métrique
+    ## Subset depending on metrics table
     switch(casTables[tableMetrique],
-           ## Cas de la table d'observation ou des tables de présence :
+           ## Observation table by unitobs and species :
            unitSp={
                 restmp <- cbind(dataMetrique[!is.na(dataMetrique[ , metrique]) , metriques, drop=FALSE],
                                 unitobs[match(dataMetrique$observation.unit[!is.na(dataMetrique[ , metrique])],
@@ -857,7 +827,7 @@ subsetToutesTables.f <- function(metrique, tabMetrics, facteurs, selections,
                                              refesp$species.code),        # ajout des colonnes sélectionnées d'especes
                                        facteurs[is.element(facteurs, colnames(refesp))], drop=FALSE])
             },
-           ## Cas de la table d'observations par classes de taille :
+           ## Observation table by unitobs, species and size class :
            unitSpSz={
                restmp <- cbind(dataMetrique[!is.na(dataMetrique[ , metrique]) ,
                                             c(metriques, "size.class"), drop=FALSE],
@@ -868,7 +838,7 @@ subsetToutesTables.f <- function(metrique, tabMetrics, facteurs, selections,
                                             refesp$species.code),        # ajout des colonnes sélectionnées d'especes
                                       facteurs[is.element(facteurs, colnames(refesp))], drop=FALSE])
            },
-           ## Autres cas :
+           ## Other cases :
            restmp <- cbind(dataMetrique[!is.na(dataMetrique[ , metrique]) , metriques, drop=FALSE],
                            unitobs[match(dataMetrique$observation.unit[!is.na(dataMetrique[ , metrique])],
                                          unitobs$observation.unit), # ajout des colonnes sélectionnées d'unitobs.
@@ -881,13 +851,7 @@ subsetToutesTables.f <- function(metrique, tabMetrics, facteurs, selections,
         selCol <- selCol[selCol != exclude]
     }
 
-    ####Subset des modalités de facteurs a dégager mais fonctionne pas à corriger !!!!
-    #for (i in selCol)
-    #{
-    #    restmp <- subset(restmp, is.element(restmp[ , facteurs[i]], selections[[i]]))
-    #}
-
-    ## Traitement particulier des classes de taille (mise en facteur avec ordre défini selon le context) :
+    ## Particular case of size classes :
     if (is.element("size.class", colnames(restmp)))
     {
         if (length(grep("^[[:digit:]]*[-_][[:digit:]]*$", unique(as.character(restmp$size.class)), perl=TRUE)) ==
@@ -906,7 +870,7 @@ subsetToutesTables.f <- function(metrique, tabMetrics, facteurs, selections,
         }
     }else{}
 
-    ## Conversion des biomasses et densités -> /100m² :
+    ## Biomass and density conversion -> /100m² :
     if (any(is.element(colnames(restmp), c("biomass", "density",
                                            "biomass.max", "density.max",
                                            "biomass.sd", "density.sd"))) && ObsType != "fishing")
@@ -926,115 +890,53 @@ subsetToutesTables.f <- function(metrique, tabMetrics, facteurs, selections,
 
 ######################################### end of the function subsetToutesTables.f
 
-######################################### start of the function calcLM.f called by modeleLineaireWP2.unitobs.f in FunctExeCalcGLMGalaxy.r
-calcLM.f <- function(loiChoisie, formule, metrique, Data)
-{
-    ## Purpose:
-    ## ----------------------------------------------------------------------
-    ## Arguments:
-    ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 17 sept. 2010, 14:49
-
-     switch(loiChoisie,
-            ## Modèle linéaire :
-            NO={
-                res <- lm(formule, data=Data)
-            },
-            ## Modèle linéaire, données log-transformées :
-            LOGNO={
-                ## Ajout d'une constante à la métrique si contient des zéros :
-                if (sum(Data[ , metrique] == 0, na.rm=TRUE))
-                {
-                    Data[ , metrique] <- Data[ , metrique] +
-                        ((min(Data[ , metrique], na.rm=TRUE) + 1) / 1000)
-                }else{}
-
-                res <- lm(formule, data=Data)
-            },
-            ## GLM, distribution Gamma :
-            GA={
-                ## Ajout d'une constante à la métrique si contient des zéros :
-                if (sum(Data[ , metrique] == 0, na.rm=TRUE))
-                {
-                    Data[ , metrique] <- Data[ , metrique] +
-                        ((min(Data[ , metrique], na.rm=TRUE) + 1) / 1000)
-                }else{}
-
-                res <- glm(formule, data=Data, family="Gamma")
-            },
-            ## GLM, distribution de Poisson :
-            PO={
-                res <- glm(formule, data=Data, family="poisson")
-            },
-            ## GLM, distribution binomiale négative :
-            NBI={
-                res <- glm.nb(formule, data=Data)
-            },
-            ## GLM, distribution binomiale (présences/absences) :
-            BI={
-                res <- glm(formule, data=Data, family="binomial")
-            },
-            )
-     return(res)
-}
-
-
-
-######################################### end of the function calcLM.f
 
 ######################################### start of the function sortiesLM.f called by modeleLineaireWP2.unitobs.f in FunctExeCalcGLMGalaxy.r
-sortiesLM.f <- function(objLM, formule, metrique, factAna, modSel, listFact, listFactSel, Data, dataEnv,
-                        Log=FALSE, sufixe=NULL, type="espece", baseEnv=.GlobalEnv)
+sortiesLM.f <- function(objLM, formule, metrique, factAna, listFact, Data, 
+                        Log=FALSE, sufixe=NULL, type="espece")
 {
-    ## Purpose: Formater les résultats de lm et les écrire dans un fichier
+    ## Purpose: Form GLM and LM results
     ## ----------------------------------------------------------------------
-    ## Arguments: objLM : un objet de classe lm
-    ##            formule : la formule utilisée (pas lisible dans le call).
-    ##            metrique : la métrique choisie.
-    ##            factAna : le facteur de séparation des analyses.
-    ##            modSel : la modalité courante.
-    ##            listFact : liste du (des) facteur(s) de regroupement.
-    ##            Data : les données utilisées.
-    ##            Log : données log-transformées ou non (booléen).
-    ##            sufixe : un sufixe pour le nom de fichier.
-    ##            type : type d'analyse, pour traitement conditionnel des
-    ##                   titres et noms de fichiers.
+    ## Arguments: objLM : lm object
+    ##            formule : LM formula
+    ##            metrique : Chosen metric
+    ##            factAna : separation factor
+    ##            listFact : Analysis factors list
+    ##            Data : Data used for analysis
+    ##            Log : put log on metric ? (boolean)
+    ##            sufixe : sufix for file name
+    ##            type : analysis type 
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 25 août 2010, 16:19
+    ## Author: Yves Reecht, Date: 25 août 2010, 16:19 modified by Coline ROYAUX 04 june 2020
 
 
-    ## Ajout d'une constante si des zéros dans la métrique + transformation 'log' :
+    ## Add constant if 0 in metric + transformation 'log' :
     if (sum(Data[ , metrique] == 0, na.rm=TRUE) & Log)
     {
         Data[ , metrique] <- Data[ , metrique] +
             ((min(Data[ , metrique], na.rm=TRUE) + 1) / 1000)
     }else{}
 
-    ## Formule de modèle lisible:
+    ## readable model formula:
     objLM$call$formula <- formule
     formule <<- formule
     resLM <<- objLM
 
-    ## Chemin et nom de fichier :
-    #resFile <- resFileLM.f(objLM=objLM, metrique=metrique, factAna=factAna, modSel=modSel, listFact=listFact,
-     #                      dataEnv=dataEnv, Log=Log, sufixe=sufixe, type=type)
-    #on.exit(tryCatch(close(resFile), error=function(e){}), add=TRUE)
-
     resFile <- "GLMSummary.txt"
-    ## Informations et statistiques globales sur le modèle :
+    ## Global informations and statistics on model :
     infoStatLM.f(objLM=objLM, resFile=resFile)
 
 
-    ## Anova globale du modèle + significativité des coefficients :
+    ## global model anova + coef significativity :
     signifParamLM.f(objLM=objLM, metrique=metrique, listFact=listFact, resFile=resFile)
 
 
     ## ##################################################
-    ## Valeurs prédites par le modèle :
+    ## values predicted by the model :
     valPreditesLM.f(objLM=objLM, Data=Data, listFact=listFact, resFile=resFile)
 
     ## ##################################################
-    ## Comparaisons multiples :
+    ## multiple comparisons :
 
     ## if (all(is.element(c("year", "protection.status"), listFact)))
     if (length(listFact) == 2)
@@ -1042,40 +944,31 @@ sortiesLM.f <- function(objLM, formule, metrique, factAna, modSel, listFact, lis
  
 
         ## compMultiplesLM.f(objLM=objLM, Data=Data, factSpatial="protection.status", factTemp="year", resFile=resFile)
-        compMultiplesLM.f(objLM=objLM, Data=Data, fact1=listFact[1], fact2=listFact[2],
-                          resFile=resFile,Log=Log)
+        #compMultiplesLM.f(objLM=objLM, Data=Data, fact1=listFact[1], fact2=listFact[2],
+         #                 resFile=resFile,Log=Log)
 
         ## Représentation des interactions :suppr
         
     }else{
         if (length(listFact) == 1)
         {
-            compSimplesLM.f(objLM=objLM, Data=Data, fact=listFact,
-                            resFile=resFile, Log=Log)
+          #  compSimplesLM.f(objLM=objLM, Data=Data, fact=listFact,
+           #                 resFile=resFile, Log=Log)
         }else{}
     }
 
     # suppr
 
     ## ##################################################
-    ## Sauvegarde des données :
+    ## simple statistics filenames :
     filename <- "GLMSummaryFull.txt"
 
- #   close(resFile)                      # Maintenant seulement on peut fermer ce fichier.
-
-#    if ( ! isTRUE(sufixe == "(red)"))
- #   {
-  #      writeData.f(filename=filename, Data=Data,
-   #                 cols=NULL)
-    #}else{}
-
-    ## Sauvegarde des infos sur les données et statistiques :
+    ## Save data on model :
     if ( ! isTRUE(sufixe == "(red)"))
     {
         infoStats.f(filename=filename, Data=Data, agregLevel=type, type="stat",
-                    metrique=metrique, #factGraph=factAna, factGraphSel=modSel,
-                    listFact=listFact)#, listFactSel=listFactSel,
-                    #dataEnv=dataEnv, baseEnv=baseEnv)
+                    metrique=metrique, factGraph=factAna, #factGraphSel=modSel,
+                    listFact=listFact)#, listFactSel=listFactSel)
     }else{}
 
     ## flush.console()
@@ -1088,26 +981,24 @@ sortiesLM.f <- function(objLM, formule, metrique, factAna, modSel, listFact, lis
 
 infoStatLM.f <- function(objLM, resFile)
 {
-    ## Purpose: Écrit les informations sur le modèle insi que les
-    ##          statistiques globale dans un fichier résultat
+    ## Purpose: Write model's info and global statistic in results files
     ## ----------------------------------------------------------------------
-    ## Arguments: objLM un objet de classe 'lm' ou 'glm'.
-    ##            resFile : une connection pour les sorties.
+    ## Arguments: objLM : LM or GLM object
+    ##            resFile : Results file
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date:  8 sept. 2010, 16:57
+    ## Author: Yves Reecht, Date:  8 sept. 2010, 16:57 modified by Coline ROYAUX 04 june 2020
 
-    ## [!!!] Attention, il arrive que les calculs bloquent ici lors du premier lancement (origine inconnue)
     sumLM <- switch(class(objLM)[1],
                     lm = summary.lm(objLM),
                     glm = summary.glm(objLM),
                     negbin = MASS:::summary.negbin(objLM),
                     summary(objLM))
 
-    ## Informations sur le modèle :
+    ## Informations on model :
     cat("Fitted model:", file=resFile, fill=1,append=TRUE)
     cat("\t", deparse(objLM$call), "\n\n\n", file=resFile, sep="",append=TRUE)
 
-    ## Stats globales :
+    ## Global statistics :
     if (length(grep("^glm", objLM$call)) == 0)
     {
         cat("Global Fisher's statistics and R^2:", "\n\n", file=resFile,append=TRUE)
@@ -1131,13 +1022,12 @@ infoStatLM.f <- function(objLM, resFile)
 
 signifParamLM.f <- function(objLM, metrique, listFact, resFile)
 {
-    ## Purpose: Écrire les résultats de l'anova globale du modèle et
-    ##          l'estimation de significativités des coefficients du modèle.
+    ## Purpose: Write Anova results and estimate coef significativity
     ## ----------------------------------------------------------------------
-    ## Arguments: objLM un objet de classe 'lm' ou 'glm'.compM
-    ##            resFile : une connection pour les sorties.
+    ## Arguments: objLM : LM or GLM object
+    ##            resFile : Results file
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date:  8 sept. 2010, 17:07
+    ## Author: Yves Reecht, Date:  8 sept. 2010, 17:07 modified by Coline ROYAUX 04 june 2020
 
     ## Anovas et résumés :
     if (length(grep("^glmmTMB", objLM$call)) > 0) #GLMMTMB
@@ -1171,12 +1061,12 @@ signifParamLM.f <- function(objLM, metrique, listFact, resFile)
 
         capture.output(printCoefmat.red(sumLM$coef$cond, anovaLM=anovaLM, objLM=objLM), file=resFile,append=TRUE)  
     }else{
-        if (length(grep("^glm", objLM$call)) > 0) # Pour les GLMs.
+        if (length(grep("^glm", objLM$call)) > 0) # GLMs.
         {
             anovaLM <- anova(objLM, test="Chisq") 
        
         }else{
-            anovaLM <- anova(objLM) # Pour les LMs.
+            anovaLM <- anova(objLM) # LMs.
         }
 
     ## Anova globale du modèle :
@@ -1200,37 +1090,13 @@ signifParamLM.f <- function(objLM, metrique, listFact, resFile)
 print.anova.ml <- function(x, digits = max(getOption("digits") - 2, 3), signif.stars = getOption("show.signif.stars"),
                            ...)
 {
-    ## Purpose: Hack de la méthode print.anova pour (franciser les sorties et)
-    ##          supprimer les infos inutiles.
+    ## Purpose: Hack of print.anova to supress useless infos
     ## ----------------------------------------------------------------------
-    ## Arguments: ceux de print.anova
+    ## Arguments: same as print.anova
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 26 août 2010, 11:36
+    ## Author: Yves Reecht, Date: 26 août 2010, 11:36 modified by Coline ROYAUX 04 june 2020
 
-    #attr(x, "row.names")[attr(x, "row.names") == "Residuals"] <- mltext("print.anova.ml.KW.resid")
-
-    ## Françisation des en-têtes (gsub itératif) :
-    #attr(x, "heading") <- iter.gsub(pattern=c("Analysis of Deviance Table",
-     #                                         "Analysis of Variance Table",
-      #                                        "Model:",
-       #                                       "Negative Binomial",
-        #                                      "binomial",
-         #                                     "Terms added sequentially \\(first to last\\)",
-          #                                    "Response:",
-           #                                   "link:"),
-            #                        replacement=c(paste0("\n--------------------------------------",
-             #                                            "-------------------------------------\n",
-              #                                           c(mltext("print.anova.ml.KW.devTab"),
-               #                                            mltext("print.anova.ml.KW.varTab"))),
-                #                                  mltext("print.anova.ml.KW.family"),
-                 #                                 mltext("print.anova.ml.KW.NB"),
-                  #                                mltext("print.anova.ml.KW.B"),
-                   #                               mltext("print.anova.ml.KW.termSeq"),
-                    #                              mltext("print.anova.ml.KW.response"),
-                     #                             mltext("print.anova.ml.KW.link")),
-                      #              x=attr(x, "heading"), fixed=TRUE)
-
-    ## Définitions issues de la fonction originale :
+    ## def from initial function :
     if (!is.null(heading <- attr(x, "heading")))
     {
         cat("\n---------------------------------------------------------------------------\n", heading, sep = "\n",append=TRUE)
@@ -1284,18 +1150,14 @@ printCoefmat.red <- function(x, digits = max(3, getOption("digits") - 2),
                              objLM=NULL,
                              ...)
 {
-    ## Purpose: Modification de printCoefmat pour n'afficher que les z-values
-    ##          et p-values, et pour les facteurs significatife uniquement.
+    ## Purpose: Modification of printCoefmat to have only z-values
+    ##          and p-values
     ## ----------------------------------------------------------------------
-    ## Arguments: ceux de printCoefmat
-    ##            + anovaLM : résultat d'anova globale du modèle (pour les
-    ##                        facteurs et intéractions significatifs).
-    ##            objLM : objet de classe 'lm' ou 'glm'
+    ## Arguments: same as printCoefmat
+    ##            + anovaLM : results of global anova 
+    ##            objLM : LM or GLM object
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 31 août 2010, 10:46
-
-    ## Sélection des coefficients à montrer (pour effets/interactions significatifs) :
-    #x <- x[selRowCoefmat(x, anovaLM, objLM), , drop=FALSE]
+    ## Author: Yves Reecht, Date: 31 août 2010, 10:46 modified by Coline ROYAUX 04 june 2020
 
     ## Définitions issues de la fonction originale :
     if (is.null(d <- dim(x)) || length(d) != 2L)
@@ -1375,7 +1237,7 @@ printCoefmat.red <- function(x, digits = max(3, getOption("digits") - 2),
     }
     else signif.stars <- FALSE
 
-    ## Sélection de colonnes :
+    ## columns selection :
     Cf <- Cf[ , ncol(Cf) - c(2:0)]
 
     print.default(Cf, quote = FALSE, right = TRUE, na.print = na.print,
@@ -1391,28 +1253,27 @@ printCoefmat.red <- function(x, digits = max(3, getOption("digits") - 2),
 
 valPreditesLM.f <- function(objLM, Data, listFact, resFile)
 {
-    ## Purpose:
+    ## Purpose: Write predicted values 
     ## ----------------------------------------------------------------------
-    ## Arguments: objLM : objet de classe 'lm' ou 'glm'.
-    ##            Data : les données utilisées pour ajuster le modèle.
-    ##            listFact : un vecteur donnant la liste des noms de
-    ##                       facteurs.
-    ##            resFile : la connection au fichier résultat
+    ## Arguments: objLM : LM or GLM object
+    ##            Data : data used by the model 
+    ##            listFact : list of used factors
+    ##            resFile : results file name
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date:  8 sept. 2010, 16:12
+    ## Author: Yves Reecht, Date:  8 sept. 2010, 16:12 modified by Coline ROYAUX 04 june 2020
 
 
     ## ##################################################
-    ## Valeurs prédites :
+    ## Predicted values :
     OrdreNivFact <- sapply(unique(Data[ , listFact]), as.numeric)
 
-    if (!is.matrix(OrdreNivFact))       # Si un seul facteur, on transforme le vecteur d'ordre des niveaux en matrice.
+    if (!is.matrix(OrdreNivFact))       # If only one factor, transform vector of level order in matrix
     {
         OrdreNivFact <- matrix(OrdreNivFact, ncol=1, dimnames=list(NULL, listFact))
     }else{}
 
     valPredites <- NULL
-    ## Valeurs prédites pour chaque combinaison réalisée des facteurs :
+    ## Predicted values for every factors combination :
     if (length(grep("^glm", objLM$call)) > 0)
     {
         valPredites <- tryCatch(predict(objLM, newdata=unique(Data[ , listFact, drop=FALSE]), type="response"), error=function(e){})
@@ -1422,24 +1283,24 @@ valPreditesLM.f <- function(objLM, Data, listFact, resFile)
 
 
     if (! is.null(valPredites)) {
-        ## Noms des valeurs prédites (combinaisons des différents niveaux de facteurs) :
+        ## Predicted values names (several factor levels combinations) :
         nomCoefs <- unique(apply(Data[ , listFact, drop=FALSE], 1, paste, collapse=":"))
         names(valPredites) <- nomCoefs
 
-        ## On remet les modalités en ordre :
+        ## put back modalities in order :
         valPredites <- valPredites[eval(parse(text=paste("order(",
                                           paste("OrdreNivFact[ , ", 1:ncol(OrdreNivFact), "]", sep="", collapse=", "),
                                           ")", sep="")))]
 
-        ## Écriture de l'en-tête :
+        ## Header :
         cat("\n\n\n---------------------------------------------------------------------------",
             "\n", "Values predicted by the model:", "\n\n",
             file=resFile,append=TRUE)
 
-        ## Écriture du résultat :
+        ## Results :
         capture.output(print(valPredites), file=resFile,append=TRUE)
     }else{
-        ## Écriture de l'en-tête :
+        ## Header :
         cat("\n\n\n---------------------------------------------------------------------------",
             "\n", "Values predicted by the model:", "\n\n",
             file=resFile,append=TRUE)
@@ -1456,37 +1317,35 @@ valPreditesLM.f <- function(objLM, Data, listFact, resFile)
 
 compMultiplesLM.f <- function(objLM, Data, fact1, fact2, resFile, exclude="", Log=FALSE)
 {
-    ## Purpose: Calculer et écrire les résultats des comparaisons multiples.
+    ## Purpose: Compute and write factor levels comparisons (when two factors in model)
     ## ----------------------------------------------------------------------
-    ## Arguments: objLM : objet de classe 'lm' ou 'glm'.
-    ##            Data : les données utilisées pour ajuster le modèle.
-    ##            fact1 : le nom du premier facteur utilisé pour les
-    ##                    comparaisons multiples.
-    ##            fact2 : le nom du second facteur utilisé pour les
-    ##                    comparaisons multiples.
-    ##            resFile : la connection pour les sorties textes.
-    ##            exclude : facteur non analysé.
+    ## Arguments: objLM : LM or GLM object
+    ##            Data : model's data
+    ##            fact1 : First factor's name
+    ##            fact2 : Second factor's name
+    ##            resFile : results file name
+    ##            exclude : ecluded factor
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date:  4 oct. 2010, 09:54
+    ## Author: Yves Reecht, Date:  4 oct. 2010, 09:54 modified by Coline ROYAUX 04 june 2020
 
     facts <- c(fact1, fact2)
 
-    ## écriture des en-têtes :
+    ## header :
     cat("\n\n\n---------------------------------------------------------------------------",
         "\nMultiple comparisons:",
         file=resFile,append=TRUE)
 
-    ## Avertissement concernant les estimations de différences :
+    ## Warnings on comparisons :
     compMultiplesAvertissement.f(objLM=objLM, Log=Log, resFile=resFile)
 
-    ## Test si un facteur est temporel :
+    ## Test if one factor is temporal :
     tempFact <- is.temporal.f(facts, unitobs)
 
-    ## Calculs des matrices de différences :
+    ## Compute differences matrix :
     for (i in seq(along=facts))
     {
         ## fact <- get(paste("fact", i, sep=""))
-        if (tempFact[i])                # Si le facteur inclus est temporel :
+        if (tempFact[i])                # If temporal factor :
         {
             assign(paste("diff", i, sep=""),
                    diffTemporelles.f(objLM=objLM,
@@ -1494,30 +1353,30 @@ compMultiplesLM.f <- function(objLM, Data, fact1, fact2, resFile, exclude="", Lo
                                      factTemp=facts[i],
                                      Data=Data,
                                      exclude=exclude))
-        }else{                          # ... sinon :
+        }else{                          # ... otherwise :
             difftmp <- diffSpatiales.f(objLM=objLM,
                                        factSpatial=facts[i],
                                        factTemp=facts[-i],
                                        Data=Data,
                                        exclude=exclude)
-            ## On réordonne d'après le second facteur (plus lisible) :
+            ## rearrange second factor :
             assign(paste("diff", i, sep=""),
                    difftmp[order(sub("^([^:]+) :.+$", "\\1", row.names(difftmp))), ])
             rm(difftmp)
         }
     }
 
-    ## Si des coefs n'ont pu être calculés, glht plante... à moins que :
+    ## If coefs can't be calculated, bug with glht... :
     if (any(is.na(coef(objLM))))
     {
-        ## Avertissement :
+        ## Warning :
         cat("\n\n\t",
             "Warning: difference matrices reduced to account for",
             "\n\tnot calculable coefficients (missing data for some levels",
             "\n\tof factors/interactions).", "\n",
             file=resFile,append=TRUE)
 
-        ## Réduction des matrices de différences :
+        ## Reduce difference matrix :
         diff1 <- diff1[ , !is.na(coef(objLM))]
         diff2 <- diff2[ , !is.na(coef(objLM))]
 
@@ -1526,7 +1385,7 @@ compMultiplesLM.f <- function(objLM, Data, fact1, fact2, resFile, exclude="", Lo
 
     for (i in seq(along=facts))
     {
-        ## Résultats des comparaisons spatiales/de statut :
+        ## Status and spatial comparisons results :
         cat(paste("\n\n", "Comparisons for differences in '", facts[i], "' ",
                   ifelse(tempFact[i],
                          paste0("(",
@@ -1556,21 +1415,21 @@ compMultiplesLM.f <- function(objLM, Data, fact1, fact2, resFile, exclude="", Lo
 ######################################### start of the function is.temporal.f called by compMultiplesLM.f and compSimplesLM.f
 is.temporal.f <- function(facteur, table)
 {
-    ## Purpose: test si un facteur est temporel ou non
+    ## Purpose: test if temporal factor or not
     ## ----------------------------------------------------------------------
-    ## Arguments: facteur : le nom (chaîne de caractères) du facteur.
-    ##            table : la table dans laquelle se trouve le champ.
+    ## Arguments: facteur : factor's name
+    ##            table : table where field is present
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date:  4 oct. 2010, 10:01
+    ## Author: Yves Reecht, Date:  4 oct. 2010, 10:01 modified by Coline ROYAUX 04 june 2020
 
     res <- sapply(facteur,
                   function(x)
               {
                   switch(x,
-                         year={           # An est toujours censé être temporel.
+                         year={           # year always temporal
                              TRUE
                          },
-                         annee.campagne={           # Vérifié en amont.
+                         annee.campagne={      
                              TRUE
                          },
                          geogr.descriptor2={ # Dépend du format.
@@ -1590,14 +1449,13 @@ is.temporal.f <- function(facteur, table)
 
 compMultiplesAvertissement.f <- function(objLM, Log, resFile)
 {
-    ## Purpose: Afficher un avertissement concernant les différences (dans la
-    ##          fonction de lien).
+    ## Purpose: Warnings about comparisons
     ## ----------------------------------------------------------------------
-    ## Arguments: objLM : objet de classe (G)LM.
-    ##            Log : booléen indiquant la log-transfomation des données.
-    ##            resFile : fichier de sortie.
+    ## Arguments: objLM : GLM or LM object
+    ##            Log : data log transformed ? boolean
+    ##            resFile : results file name
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 31 janv. 2011, 14:11
+    ## Author: Yves Reecht, Date: 31 janv. 2011, 14:11  modified by Coline ROYAUX 04 june 2020
 
     cat("\n",
         switch(modelType.f(objLM=objLM, Log=Log),
@@ -1636,10 +1494,10 @@ modelType.f <- function(objLM, Log)
 {
     ## Purpose: Fournir un prefix décrivant le modèle utilisé.
     ## ----------------------------------------------------------------------
-    ## Arguments: objLM : un objet de classe LM ou GLM.
-    ##            Log : log-transformation des données (boolean).
+    ## Arguments: objLM : GLM or LM object
+    ##            Log : data log transformed ? boolean
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 14 oct. 2010, 16:29
+    ## Author: Yves Reecht, Date: 14 oct. 2010, 16:29 modified by Coline ROYAUX 04 june 2020
 
     return(ifelse(length(grep("^lm\\(", deparse(objLM$call), perl=TRUE)) > 0,
                   paste("LM", ifelse(Log, "-log", ""), sep=""),
@@ -1660,16 +1518,15 @@ modelType.f <- function(objLM, Log)
 
 diffTemporelles.f <- function(objLM, factSpatial, factTemp, Data, exclude)
 {
-    ## Purpose: Calcule et retourne la matrice de différences temporelles par
-    ##          statut(pour une utilisation avec la fonction 'glht').
+    ## Purpose: Compute temporal differences matrix 
     ## ----------------------------------------------------------------------
-    ## Arguments: objLM : un objet de classe 'lm' ou 'glm'.
-    ##            factSpatial : nom du facteur spatial.
-    ##            factTemp : nom du facteur temporel.
-    ##            Data : données utilisées pour ajuster le modèle.
-    ##            exclude : facteur non analysé.
+    ## Arguments: objLM : GLM or LM object
+    ##            factSpatial : spatial factor's name
+    ##            factTemp : temporal factor's name
+    ##            Data : data of the model
+    ##            exclude : excluded factor
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date:  8 sept. 2010, 11:11
+    ## Author: Yves Reecht, Date:  8 sept. 2010, 11:11 modified by Coline ROYAUX 04 june 2020
 
     ## Coefficients :
     if (length(grep("^glmmTMB", objLM$call)) > 0)
@@ -1683,14 +1540,13 @@ diffTemporelles.f <- function(objLM, factSpatial, factTemp, Data, exclude)
                    c(tail(rev(levels(Data[ , factTemp])), 1), tail(rev(levels(Data[ , factTemp])),  - 1)),
                    sep=" - ")
 
-    ## Matrice pour construire les différences entre coefficients :
+    ## Matrix for coef differences :
     Dtemp <- matrix(0,
-                    ## Il y a autant de différences temporelles que de niveaux pour la variable temporelle (en raison de
-                    ## la différence supplémentaire final - initial) :
+                    ## As much temporal differences as levels for temporal variable :
                     nrow=nlevels(Data[ , factTemp]) * nlevels(Data[ , factSpatial]),
                     ncol=length(theta))
 
-    ## Noms des colonnes (pas obligatoire mais utile pour vérification) :
+    ## colnames (not necessary but help for verifications) :
 
     row.names(Dtemp) <- paste(rep(levels(Data[ , factSpatial]), each=nlevels(Data[ , factTemp])),
                               tDiff,
@@ -1699,7 +1555,7 @@ diffTemporelles.f <- function(objLM, factSpatial, factTemp, Data, exclude)
 
     colnames(Dtemp) <- theta
 
-    ## Noms de colonnes ordonnés :
+    ## ordonate colnames :
     if (length(grep("^glmmTMB", objLM$call)) > 0)
     {
         namesCol <- c(colnames(Data)[1],
@@ -1709,9 +1565,9 @@ diffTemporelles.f <- function(objLM, factSpatial, factTemp, Data, exclude)
                       colnames(objLM$model[ , -1]))
     }
 
-    namesCol <- namesCol[! is.element(namesCol, exclude)] # - colonne exclue
+    namesCol <- namesCol[! is.element(namesCol, exclude)] # excluded column
 
-    ## Calculs des nombres de colonnes des facteurs et intéraction :
+    ## Compute factor's column count and interactions :
     nlev <- combn(sapply(Data[ , namesCol],
                          function(x)
                      {
@@ -1721,14 +1577,13 @@ diffTemporelles.f <- function(objLM, factSpatial, factTemp, Data, exclude)
                      }),
                   2)
 
-    ## Nombre de colonnes par type de facteur/interaction :
+    ## Columns number per factor type/interaction :
     nCol <- apply(nlev, 2, prod)
 
-    ## Position de la première colonne
+    ## Location of first column
     premiereCol <- cumsum(c(1, nCol[- length(nCol)])) + 1
 
-    ## Position des facteurs d'intérêt et leur interaction,
-    ## dans l'ordre de l'ensemble des facteurs et interactions :
+    ## Interest factor's and their interaction's position :
     facts <- c(factSpatial, factTemp)
     posTemp <- 1
     posSpatial <- 2
@@ -1745,7 +1600,7 @@ diffTemporelles.f <- function(objLM, factSpatial, factTemp, Data, exclude)
                  length.out=nCol[posTemp])] <- sapply(as.data.frame(d1), rep, nlevels(Data[ , factSpatial]))
 
 
-    ## Différences sur les interactions :
+    ## Interactions differences :
 #    d2 <- Dtemp[ , seq(from=premiereCol[posInteraction],
  #                       length.out=nCol[posInteraction]), drop=FALSE]
 
@@ -1777,16 +1632,15 @@ diffTemporelles.f <- function(objLM, factSpatial, factTemp, Data, exclude)
 
 diffSpatiales.f <- function(objLM, factSpatial, factTemp, Data, exclude)
 {
-    ## Purpose: Calcule et retourne la matrice de différences spatiales par
-    ##          année (pour une utilisation avec la fonction 'glht').
+    ## Purpose: Compute spatial differences matrix
     ## ----------------------------------------------------------------------
-    ## Arguments: objLM : un objet de classe 'lm' ou 'glm'.
-    ##            factSpatial : nom du facteur spatial.
-    ##            factTemp : nom du facteur temporel.
-    ##            Data : données utilisées pour ajuster le modèle.
-    ##            exclude : facteur non analysé.
+    ## Arguments: objLM : GLM or LM object
+    ##            factSpatial : spatial factor name
+    ##            factTemp : temporal factor name
+    ##            Data : model's data
+    ##            exclude : excluded factor
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date:  7 sept. 2010, 16:15
+    ## Author: Yves Reecht, Date:  7 sept. 2010, 16:15 modified by Coline ROYAUX 04 june 2020
 
     ## Coefficients :
     if (length(grep("^glmmTMB", objLM$call)) > 0)
@@ -1795,23 +1649,23 @@ diffSpatiales.f <- function(objLM, factSpatial, factTemp, Data, exclude)
     }else{
         theta <- names(coef(objLM))
     }
-    ## Nom des différences spatiales (statut de protection) :
+    ## Spatial differences name (protection status) :
 
     sDiff <- apply(combn(unique(Data[ , factSpatial]), 2),
                    2,
                    function(x){paste(rev(x), collapse = " - ")})
 
-    ## Matrice pour construire les différences entre coefficients :
+    ## Matrix to construct coef differences :
     Dspat <- matrix(0,
                     nrow=nlevels(Data[ , factTemp]) * choose(nlevels(Data[ , factSpatial]), 2),
                     ncol=length(theta))
 
-    ## Noms des colonnes (pas obligatoire mais utile pour vérification) :
+    ## Colnames (not necessary but help for verifications) :
     #row.names(Dspat) <- paste(levels(Data[ , factTemp]),
      #                         rep(sDiff, each=nlevels(Data[ , factTemp])), sep=" : ")
     colnames(Dspat) <- theta
 
-    ## Noms de colonnes ordonnés :
+    ## Ordonate colnames :
     if (length(grep("^glmmTMB", objLM$call)) > 0)
     {
         namesCol <- c(colnames(Data)[1],
@@ -1821,9 +1675,9 @@ diffSpatiales.f <- function(objLM, factSpatial, factTemp, Data, exclude)
                       colnames(objLM$model[ , -1]))
     }
 
-    namesCol <- namesCol[! is.element(namesCol, exclude)] # - colonne exclue
+    namesCol <- namesCol[! is.element(namesCol, exclude)] # - excluded column
 
-    ## Calculs des nombres de colonnes des facteurs et intéraction :
+    ## Compute factor's column count and interactions :
     nlev <- combn(sapply(Data[ , namesCol],
                          function(x)
                      {
@@ -1833,21 +1687,20 @@ diffSpatiales.f <- function(objLM, factSpatial, factTemp, Data, exclude)
                      }),
                   2)
 
-    ## Nombre de colonnes par type de facteur/interaction :
+    ## Columns number per factor type/interaction :
     nCol <- apply(nlev, 2, prod)
 
-    ## Position de la première colonne
+    ## Location of first column
     premiereCol <- cumsum(c(1, nCol[- length(nCol)])) + 1
 
-    ## Position des facteurs d'intérêt et leur interaction,
-    ## dans l'ordre de l'ensemble des facteurs et interactions :
+    ## Interest factor's and their interaction's position :
     facts <- c(factSpatial, factTemp)
     posTemp <- 1
     posSpatial <- 2
     #posInteraction <- which(is.element(attr(objLM$terms, "term.labels"),
      #                                  paste(facts, rev(facts), sep=":")))
 
-    ## Différences entres les effets statuts (sans intéraction temporelles) :
+    ## Differences between status (sans interaction temporelles) :
 
     tmp <- sapply(as.data.frame(combn(1:nlevels(Data[ , factSpatial]), 2)),
                   function(x)
@@ -1870,7 +1723,7 @@ diffSpatiales.f <- function(objLM, factSpatial, factTemp, Data, exclude)
 
     Dspat[ , premiereCol[posSpatial] - 1 + 1:nCol[posSpatial]] <- m[ , -1]
 
-    ## Ajout des intéractions :
+    ## Add interactions :
   #  tmp2 <- Dspat[ , seq(from=premiereCol[posInteraction], length.out=nCol[posInteraction]), drop=FALSE]
 #
   #  l <- 1
@@ -1904,7 +1757,7 @@ diffSpatiales.f <- function(objLM, factSpatial, factTemp, Data, exclude)
      #   l <- l + nlevels(Data[ , factTemp])
     #}
 #
- #   ## Stockage des différences d'interactions :
+ #   ## Stock interactions differences :
   #  Dspat[ , seq(from=premiereCol[posInteraction], length.out=nCol[posInteraction])] <- tmp2
 
     return(Dspat)
@@ -1971,11 +1824,11 @@ print.summary.glht.red <- function (x, digits = max(3, getOption("digits") - 3),
 graphTitle.f <- function(metrique, modGraphSel, factGraph, listFact, model=NULL, type="espece",
                          lang = getOption("P.lang"))
 {
-    ## Purpose:
+    ## Purpose: Automatically write a name for a graph
     ## ----------------------------------------------------------------------
     ## Arguments:
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 14 oct. 2010, 15:44
+    ## Author: Yves Reecht, Date: 14 oct. 2010, 15:44 modified by Coline ROYAUX 04 june 2020
     return(paste(ifelse(is.null(model),
                         "Values of ",
                         paste(model,
@@ -1995,40 +1848,40 @@ graphTitle.f <- function(metrique, modGraphSel, factGraph, listFact, model=NULL,
                         ""),
                  switch(type,
                         "espece"={
-                            ifelse(modGraphSel == "", # Facteur de séparation uniquement si défini.
+                            ifelse(modGraphSel == "", # Only separation factor if defined
                                    "",
                                    paste("\nfor the field",
                                          " '", factGraph, "' = ", modGraphSel, sep=""))
                         },
                         "CL_espece"={
-                            ifelse(modGraphSel == "", # Facteur de séparation uniquement si défini.
+                            ifelse(modGraphSel == "", # Only separation factor if defined
                                    "",
                                    paste("\nfor the field",
                                          " '", factGraph, "' = ", modGraphSel, sep=""))
                         },
                         "unitobs"={
-                            ifelse(modGraphSel[1] == "", # Facteur de séparation uniquement si défini.
+                            ifelse(modGraphSel[1] == "", # Only separation factor if defined
                                    "\nfor all species",
                                    paste("\nfor all species matching",
                                          " '", factGraph, "' = (",
                                          paste(modGraphSel, collapse=", "), ")", sep=""))
                         },
                         "unitobs(CL)"={
-                            ifelse(modGraphSel[1] == "", # Facteur de séparation uniquement si défini.
+                            ifelse(modGraphSel[1] == "", # Only separation factor if defined
                                    "\nfor all size classes",
                                    paste("\nfor size classes matching",
                                          " '", factGraph, "' = (",
                                          paste(modGraphSel, collapse=", "), ")", sep=""))
                         },
                         "CL_unitobs"={
-                            ifelse(modGraphSel[1] == "", # Facteur de séparation uniquement si défini.
+                            ifelse(modGraphSel[1] == "", # Only separation factor if defined
                                    "\nfor all species",
                                    paste("\nfor all species matching",
                                          " '", factGraph, "' = (",
                                          paste(modGraphSel, collapse=", "), ")", sep=""))
                         },
                         "biodiv"={
-                            ifelse(modGraphSel[1] == "", # Facteur de séparation uniquement si défini.
+                            ifelse(modGraphSel[1] == "", # Only separation factor if defined
                                    "",
                                    paste("\nfor stations matching",
                                          " '", factGraph, "' = (",
@@ -2039,88 +1892,64 @@ graphTitle.f <- function(metrique, modGraphSel, factGraph, listFact, model=NULL,
                  paste(sapply(listFact[length(listFact):1],
                               function(x)paste(c(## varNames.f(x, "article"),
                                                  "",
-                                                 varNames.f(x, "nom")), collapse="")),
+                                                 x, collapse="")),
                        collapse=" and"),
-                 "\n", sep=""))
+                 "\n", sep="")))
 }
 
 ######################################### end of the function graphTitle.f
-
-######################################### start of the function Capitalize.f called by sortiesLM.f
-
-Capitalize.f <- function(x, words=FALSE)
-{
-    ## Purpose: Mettre en majuscule la première lettre de chaque mot
-    ## ----------------------------------------------------------------------
-    ## Arguments: x : une chaîne de caractères
-    ##            words : tous les mots (TRUE), ou juste le premier.
-    ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date:  9 août 2010, 21:08
-
-    if (words)
-    {
-        s <- strsplit(x, " ")[[1]]
-    }else{
-        s <- x
-    }
-
-    return(paste(toupper(substring(s, 1,1)), substring(s, 2),
-                 sep="", collapse=" "))
-}
-
-######################################### end of the function Capitalize.f
 
 ######################################### start of the function compSimplesLM.f called by sortiesLM.f
 
 compSimplesLM.f <- function(objLM, Data, fact, resFile, Log=FALSE)
 {
-    ## Purpose: Calculer et écrire les résultats des comparaisons simples.
+    ## Purpose: Compute simple comparisons (when only one factor in model)
     ## ----------------------------------------------------------------------
-    ## Arguments: objLM : objet de classe 'lm' ou 'glm'.
-    ##            Data : les données utilisées pour ajuster le modèle.
-    ##            fact : le nom du facteur utilisé.
-    ##            resFile : la connection pour les sorties textes.
+    ## Arguments: objLM : LM or GLM object.
+    ##            Data : data to adjust model
+    ##            fact : factor's name
+    ##            resFile : Results file name
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date:  4 oct. 2010, 15:51
+    ## Author: Yves Reecht, Date:  4 oct. 2010, 15:51 modified by Coline ROYAUX 04 june 2020
 
-    ## écriture des en-têtes :
+    ## header :
     cat("\n\n\n---------------------------------------------------------------------------",
         "\n", "Comparisons of levels:",
         file=resFile,append=TRUE)
 
-    ## Avertissement concernant les estimations de différences :
+    ## Warning on comparisons :
     compMultiplesAvertissement.f(objLM=objLM, Log=Log, resFile=resFile)
 
     if (is.temporal.f(fact, unitobs))
     {
-        ## Suite en-tête :
+        ## header :
         cat(paste("\n\n\t", "Factor",
                   " '", fact, "' (",
                   "temporal",
                   ") :\n", sep=""),
             file=resFile,append=TRUE)
 
-        ## Comparaisons temporelles :
+        ## temporal comparisons :
         compSimple <- glht(objLM,
                            linfct=diffTempSimples.f(objLM=objLM, fact=fact, Data=Data),
                            alternative="two.sided")
 
-        ## Écriture des résultats :
+        ## write results :
         capture.output(print.summary.glht.red(summary(compSimple)),
                    file=resFile,append=TRUE)
 
     }else{
-        ## Suite en-tête :
+        ## header :
         cat(paste("\n\n", "Factor",
                   " '", fact, "' :\n", sep=""),
             file=resFile,append=TRUE)
 
-        ## Comparaisons de toutes les paires ("Tukey") :
+        ## Tukey, pair comparisons :
         compSimple <- glht(objLM,
                            linfct=eval(parse(text=paste("mcp(", fact, "=\"Tukey\")"))),
                            alternative="two.sided")
 
-        ## Écriture des résultats :
+        ## write results :
         capture.output(print.summary.glht.red(summary(compSimple)),
                    file=resFile,append=TRUE)
     }
@@ -2133,12 +1962,11 @@ diffTempSimples.f <- function(objLM, fact, Data)
 {
     ## Purpose:
     ## ----------------------------------------------------------------------
-    ## Arguments: objLM : un objet de classe 'lm' ou 'glm'.
-    ##            factSpatial : nom du facteur spatial.
-    ##            factTemp : nom du facteur temporel.
-    ##            Data : données utilisées pour ajuster le modèle.
+    ## Arguments: objLM : GLM or LM object
+    ##            factSpatial : spatial factor's name
+    ##            Data : model's data
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date:  4 oct. 2010, 16:28
+    ## Author: Yves Reecht, Date:  4 oct. 2010, 16:28 modified by Coline ROYAUX 04 june 2020
 
     tDiff <- paste(c(head(rev(levels(Data[ , fact])), 1), head(rev(levels(Data[ , fact])),  - 1)),
                    c(tail(rev(levels(Data[ , fact])), 1), tail(rev(levels(Data[ , fact])),  - 1)),
@@ -2157,7 +1985,7 @@ diffTempSimples.f <- function(objLM, fact, Data)
                       dimnames=list(tDiff, theta))
 
 
-    ## Différences sur l'effet temporel seul :
+    ## temporal effect differences :
     diffMat[ , -1] <- rbind(c(-1, rep(0, diffDim - 2), 1),
                             cbind(0, diag(1, diffDim - 1)[ , seq(diffDim - 1, 1)]) +
                             cbind(diag(-1, diffDim - 1)[ , seq(diffDim - 1, 1)], 0))[ , -1]
@@ -2169,10 +1997,9 @@ diffTempSimples.f <- function(objLM, fact, Data)
 ######################################### start of the function infoStats.f called by sortiesLM.f
 
 infoStats.f <- function(filename, Data, agregLevel=c("species", "unitobs"), type=c("graph", "stat"),
-                        metrique, factGraph, factGraphSel, listFact, listFactSel,
-                        dataEnv, baseEnv=.GlobalEnv)
+                        metrique, factGraph, factGraphSel, listFact, listFactSel)
 {
-    ## Purpose: Écrire les infos et statistique sur les données associées à
+    ## Purpose: Écrire les infos et statistic sur les données associées à
     ##          un graphique ou analyse.
     ## ----------------------------------------------------------------------
     ## Arguments: filename : chemin du fichier de résultats.
@@ -2185,36 +2012,25 @@ infoStats.f <- function(filename, Data, agregLevel=c("species", "unitobs"), type
     ##            listFact : liste du (des) facteur(s) de regroupement
     ##            listFactSel : liste des modalités sélectionnées pour ce(s)
     ##                          dernier(s)
-    ##            dataEnv : environnement de stockage des données.
-    ##            baseEnv : environnement de l'interface.
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 10 sept. 2012, 15:26
+    ## Author: Yves Reecht, Date: 10 sept. 2012, 15:26 modified by Coline ROYAUX 04 june 2020
 
-    ## Ajout de l'extension si besoin :
-    #if ( ! grepl("\\.stats$", filename[1], ignore.case=TRUE))
-    #{
-     #   filename <- paste(filename, ".stats", sep="")
-    #}else{}
-
-    ## Ouverture du fichier :
+    ## Open file :
     File <- file(description=filename,
                  open="w", encoding="latin1")
 
-    ## Si erreur, on referme le fichier à la sortie de fonction :
+    ## if error  :
     on.exit(if (exists("filename") &&
                 tryCatch(isOpen(File),
                          error=function(e)return(FALSE))) close(File))
 
-    ## Informations générales sur les données :
-    #printGeneralDataInfo.f(dataEnv=dataEnv, baseEnv=baseEnv, File=File) ##Utilise les données de l'environnement et le tcltk donc à voir comment corriger
-
-    ## Informations sur les métriques et facteurs du graphique :
+    ## Metrics and factors infos :
     printSelectionInfo.f(metrique=metrique, #factGraph=factGraph, factGraphSel=factGraphSel,
                          listFact=listFact, #listFactSel=listFactSel, 
                          File=File,
                          agregLevel=agregLevel, type=type)
 
-    ## Statistiques :
+    ## statistics :
     if (class(Data) == "list")
     {
         cat("\n###################################################",
@@ -2232,77 +2048,39 @@ infoStats.f <- function(filename, Data, agregLevel=c("species", "unitobs"), type
                      headline=NULL)
     }
 
-    ## Fermeture du fichier :
+    ## Close file :
     close(File)
 
 }
 
 ######################################### end of the function infoStats.f
 
-######################################### start of the function printGeneralDataInfo.f called by infoStats.f
-
-#printGeneralDataInfo.f <- function(dataEnv, baseEnv, File)
-#{
-    ## Purpose: Écrire dans un fichier les informations générales sur le jeu
-    ##          de données (inclue les sélections au niveau de la
-    ##          plateforme).
-    ## ----------------------------------------------------------------------
-    ## Arguments: dataEnv : environnement des données.
-    ##            baseEnv : environnement de l'interface principale.
-    ##            File : connection du fichier où écrire les informations.
-    ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 11 sept. 2012, 10:36
-
-    ## Informations sur les fichiers de données :
-    #cat(paste("####################\nDatasets:\n",
-     #         "\n  * Identification of the case study: ", paste(getOption("P.MPA"), collapse=", "),
-              #"\n  * Data directory: ", dataEnv$fileNames["ws"], "/Data/",
-      #        mltext("printGeneralDataInfo.f.4"), dataEnv$fileNames["obs"],
-       #       mltext("printGeneralDataInfo.f.5"), dataEnv$fileNames["unitobs"],
-        #      mltext("printGeneralDataInfo.f.6"), dataEnv$fileNames["refesp"],
-         #     mltext("printGeneralDataInfo.f.7"), dataEnv$fileNames["refspa"], "\n",
-          #    sep=""),
-        #file=File,append=TRUE)
-
-    ## Sélections au niveau de la plateforme :
-    #cat(ifelse((tmp <- evalq(tclvalue(tkcget(MonCritere, "-text")), envir=.baseEnv)) == "Tout",
-     #          "\nNo general selection on data.\n",
-      #         paste("\nGeneral selection(s):\n\n", tmp, "\n", sep="")),
-       # file=File,append=TRUE)
-#}
-
-######################################### end of the function printGeneralDataInfo.f
 
 ######################################### start of the function printSelectionInfo.f called by infoStats.f
 
-printSelectionInfo.f <- function(metrique, factGraph, factGraphSel, listFact, listFactSel,
+printSelectionInfo.f <- function(metrique, listFact, 
                                  File,
                                  agregLevel=c("species", "unitobs"), type=c("graph", "stat"))
 {
-    ## Purpose: Écrire dans un fichier les informations sur la sélection de
-    ##          données (obtenue par l'interface standard de sélection).
+    ## Purpose: Write data informations
     ## ----------------------------------------------------------------------
-    ## Arguments: metrique : la métrique choisie.
-    ##            factGraph : le facteur sélection des espèces.
-    ##            factGraphSel : la sélection de modalités pour ce dernier
-    ##            listFact : liste du (des) facteur(s) de regroupement
-    ##            listFactSel : liste des modalités sélectionnées pour ce(s)
-    ##                          dernier(s)
-    ##            File : connection du fichier où écrire les informations.
-    ##            agregLevel : niveau d'agrégation de la fonction appelante.
-    ##            type : type de fonction appelante (grapique ou analyse).
+    ## Arguments: metrique : chosen metric
+    ##            listFact : factor's list
+    ##            File : Results file name
+    ##            agregLevel : aggregation level
+    ##            type : function type 
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 11 sept. 2012, 10:41
+    ## Author: Yves Reecht, Date: 11 sept. 2012, 10:41 modified by Coline ROYAUX 04 june 2020
 
     cat("\n##################################################\n",
         "Metrics and factors (and possible units/selections):\n",
         sep="", file=File,append=TRUE)
 
-    ## Informations sur la métrique :
+    ## metric info :
     cat("\n Metrics:", metrique,
         "\n", file=File,append=TRUE)
 
-    ## Niveau d'agrégation :
+    ## aggregation level :
     cat("            aggregated per ",
         switch(agregLevel,
                "CL_espece"=,"CL_unitobs"=,"spCL_unitobs"=,"spCL_espece"={
@@ -2324,7 +2102,7 @@ printSelectionInfo.f <- function(metrique, factGraph, factGraphSel, listFact, li
         ".\n",
         sep="", file=File,append=TRUE)
 
-    ## Facteurs de séparation de graphiques/analyses ou sélection d'observations :
+    ## Separation factors :
 #    switch(agregLevel,
  #          "species"=,"CL_espece"=,"espece"={ # Adapté également pour les LMs.
   #             cat("\n",
@@ -2349,7 +2127,7 @@ printSelectionInfo.f <- function(metrique, factGraph, factGraphSel, listFact, li
         #           sep="", file=File,append=TRUE)
          #  })
 
-    ## Facteurs de regroupements :
+    ## Clustering factors :
     if (is.element(agregLevel, c("spCL_unitobs", "spCL_espece", "spSpecies", "spEspece",
                                  "spUnitobs", "spUnitobs(CL)"))) {type <- "spatialGraph"}
 
@@ -2373,64 +2151,21 @@ printSelectionInfo.f <- function(metrique, factGraph, factGraphSel, listFact, li
 
 ######################################### end of the function printSelectionInfo.f
 
-######################################### start of the function varNames.f called by printSelectionInfo.f
-
-varNames.f <- function(fields, info="name", quote=TRUE)
-{
-    ## Purpose: revoyer les informations (en particulier nom) sur le nom
-    ##          "d'usage" d'un ou plusieurs champ(s).
-    ## ----------------------------------------------------------------------
-    ## Arguments: fields : champ(s) recherché(s).
-    ##            info : type d'info ("name", "article", "gender", "unit")
-    ##            quote : faut-il mettre des guillemets pour les noms de
-    ##                    champs tels-quels (pas de nom d'usage défini).
-    ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 21 févr. 2013, 18:21
-
-    info <- info[1]
-
-    if (is.element(info, c("nom", "name")))
-    {
-        ## S'il n'est pas définit, le nom d'usage est remplacé par le nom de champ plutôt que par NA :
-        res <- ifelse(is.na(tmp <- varNames[fields, "nom"]),
-                      paste(ifelse(quote, "\"", ""),
-                            fields,
-                            ifelse(quote, "\"", ""), sep=""),
-                      tmp)
-    }else{
-        ## Possibilité de nommer les infos en français et anglais:
-        res <- ifelse(is.na(varNames[fields, info]),
-                      "",
-                      varNames[fields,
-                               switch(info,
-                                      "article"="article",
-                                      "genre"=,
-                                      "gender"="genre",
-                                      "unite"=,
-                                      "unit"="unite",
-                                      "nom")])
-    }
-
-    return(res)
-}
-
-######################################### end of the function varNames.f
 
 ######################################### start of the function printStats.f called by infoStats.f
 
 printStats.f <- function(Data, metrique, listFact, File, headline=NULL)
 {
-    ## Purpose: Écrire les tableaux de statistiques générales et par
-    ##          croisement de facteur dans un fichier.
+    ## Purpose: Write general statistics table
     ## ----------------------------------------------------------------------
-    ## Arguments: Data : les données du graphique/de l'analyse.
-    ##            metrique : nom de la métrique.
-    ##            listFact : liste des facteurs de regroupement/de l'analyse.
-    ##            File : la connection du fichier où écrire.
+    ## Arguments: Data : Analysis data
+    ##            metrique : metric's name 
+    ##            listFact : Factor's list
+    ##            File : Simple statistics file name
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 11 sept. 2012, 10:09
+    ## Author: Yves Reecht, Date: 11 sept. 2012, 10:09 modified by Coline ROYAUX 04 june 2020
 
-    ## Ligne d'en-tête (si besoin : traitement par espèces uniquement) :
+    ## Header :
     if ( ! is.null(headline))
     {
         cat("\n", rep("#", nchar(headline) + 3), "\n",
@@ -2447,7 +2182,7 @@ printStats.f <- function(Data, metrique, listFact, File, headline=NULL)
         cat("\n#########################################",
             "\nStatistics per combination of factor levels:\n\n", file=File, sep="",append=TRUE)
 
-        ## Calcul du summary pour chaque croisement (existant) de facteur :
+        ## Compute summary for each existing factor's cross :
         res <- with(Data,
                     tapply(eval(parse(text=metrique)),
                            INDEX=do.call(paste,
@@ -2456,81 +2191,30 @@ printStats.f <- function(Data, metrique, listFact, File, headline=NULL)
                                            sep=".")),
                            FUN=summary.fr))
 
-        ## Assemblage du résultat dans un tableau
+        ## results in table
         capture.output(print(do.call(rbind, res)),
                        file=File, append=TRUE)
     }else{}
 
-    ## Ligne vide (pour l'esthétique) :
+    ## empty line :
     cat("\n", file=File,append=TRUE)
 }
 
 ######################################### end of the function printStats.f
 
-######################################### start of the function errorLog.f called by modeleLineaireWP2.unitobs.f in FunctExeCalcGLMCalaxy.r
-
-errorLog.f <- function(error, niv=-3)
-{
-    ## Purpose: Écrire les erreurs dans un fichier log + avertissement de
-    ##          l'utilisateur
-    ## ----------------------------------------------------------------------
-    ## Arguments: error : erreur (récupérée par la fonction tryCatch).
-    ##            niv : niveau de l'appel pour retrouver la fonction
-    ##                  appelante (-3 par défaut pour tryCatch).
-    ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 22 déc. 2010, 11:54
-
-    on.exit(if (exists("logFile") &&
-                tryCatch(isOpen(logFile),
-                         error=function(e)return(FALSE))) close(logFile))
-
-    ## Test d'existance et éventuelle création du dossier de logs :
-    #if (!isTRUE(file.info("./logs")$isdir))
-     # {
-      #    dir.create("./logs")
-      #}
-
-    ## Test d'existance et éventuelle création du fichier de log du jour :
-    logFileName <- "Errors.txt"
-
-#    if (!file.exists(paste("./logs/", logFileName, sep="")) ||
- #       isTRUE(file.info(paste("./logs/", logFileName, sep=""))$isdir))
-  #    {
-   #       file.create(paste("./logs/", logFileName, sep=""))
-    #  }
-
-    #logFile <- file(description=paste("./logs/", logFileName, sep=""),
-     #               open="a", encoding="latin1")
-
-
-    callingFct <- sys.call(niv)
-
-    cat(paste("\n", format(Sys.time(), "[%H:%M:%S]"), "\n",
-              paste(deparse(callingFct), collapse="\n\t"), " :\n", sep=""),
-        file=logFile,append=TRUE)
-    capture.output(print(error), file=logFile,append=TRUE)
-    cat("\n", file=logFile,append=TRUE)
-
-    close(logFile)
-
-    message("\n\tThere was an error.", "\n\tPlease see the log file: ", logFileName, "\n")
-}
-
-######################################### end of the function errorLog.f
 
 ######################################### start of the function summary.fr called by printStats.f
 summary.fr <- function(object, digits = max(3, getOption("digits") - 3),...)
 {
     ## Purpose: Adding SD and N to summary
     ## ----------------------------------------------------------------------
-    ## Arguments: object : objet à résumer.
-    ##            ... : argument supplémentaires passés à summary().
+    ## Arguments: object : Object to summarise
     ## ----------------------------------------------------------------------
-    ## Author: Yves Reecht, Date: 13 sept. 2012, 15:47
+    ## Author: Yves Reecht, Date: 13 sept. 2012, 15:47 modified by Coline ROYAUX 04 june 2020
 
     if ( ! is.numeric(object)) stop("Programming error")
 
-    ## Calcul du résumé :
+    ## Compute summary :
     res <- c(summary(object=object, digits, ...), "sd"=signif(sd(x=object), digits=digits), "N"=length(object))
 
     return(res)
