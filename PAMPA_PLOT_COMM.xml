@@ -1,60 +1,64 @@
-<tool id="pampa_glmcomm" name="Compute GLM on community data" version="@VERSION@">
-    <description>Compute a GLM of your choice on community data</description>
+<tool id="pampa_plotcomm" name="Create a plot from community data" version="@VERSION@">
+    <description>With variables of your choice</description>
     <macros>
         <import>pampa_macros.xml</import>
     </macros>
-    <expand macro="GLM_requirements"/>
+    <expand macro="Plot_requirements"/>
     <command detect_errors="exit_code"><![CDATA[
         Rscript 
-         '$__tool_directory__/FunctExeCalcGLMGalaxy.r' 
+         '$__tool_directory__/FunctExePlotCommGalaxy.r' 
          '$input_metric'
          '$input_unitobs'
          '$varint'
-         '$varrep'
-         '$varrand'
-         '$sep'
-         #if $settings.advanced=='advanced' 
+         '$varrepP'
+         '$varrepS'
+         '$type'
+         '$split'
+         #if $settings.advanced=='advanced'
              $settings.distrib
-             'FALSE'
+             $settings.log
          #else
              'None'
              'FALSE'
          #end if
-         'unit'
          '$__tool_directory__/FunctPAMPAGalaxy.r' 
-         '$output_summary'
-         '$output_recap'
+         '$output_plot'
     ]]>
     </command>
     <inputs>
-        <expand macro="pampa_input_GLM"/>
-        <param name="sep" type="data_column" data_ref="input_unitobs" force_select="false" label="Separation factor of your analysis from unitobs file" help= "Choose the field of the separation factor, for each level of this factor, one GLM will be computed."/>
-        <expand macro="pampa_var_GLM"/>
+        <param name="input_metric" type="data" format="tabular" label="Input metrics file" help="Metrics data file, with location, year, and metrics informations as 'species richness', 'Simpson index' or others who can be used as interest variable."/>
+        <param name="input_unitobs" type="data" format="tabular" label="Unitobs informations file" help="Unitobs file, with all informations available about unitobs."/>
+        <param name="varint" type="data_column" data_ref="input_metric" label="Y variable from metrics file" help= "Choose the field of the Y variable."/>
+        <param name="varrepP" type="data_column" data_ref="input_unitobs" label="X variable from unitobs file" help= "Choose the field of the X variable."/>
+        <param name="varrepS" type="data_column" data_ref="input_unitobs" force_select="false" label="Colours variable from unitobs file" help= "Choose the field of the variable determining separate colours in plot(s)."/>
+        <param name="type" type="select" label="Plot type" help= "Choose the type of plot you want in output.">
+            <option selected="true" value="plot">Temporal trend</option>
+            <option value="boxplot">Boxplot</option>
+            <option value="bar">Barplot</option>
+        </param>
+        <param name="split" type="data_column" data_ref="input_unitobs" force_select="false" label="Separation factor for plots from unitobs file" help= "Choose the field of the separation factor, for each level of this factor, one plot will be created."/>
         <conditional name="settings">
-            <expand macro="pampa_advanced_params_select_GLM"/>
+            <expand macro="pampa_advanced_params_select"/>
+            <when value="advanced">
+                <param name="log" type="boolean" truevalue="TRUE" falsevalue="FALSE" checked="yes" label="Log on interest variable ?"/>
+            </when>
         </conditional>
     </inputs>
     <outputs>
-        <data name="output_summary" from_work_dir="GLMSummary.tabular" format="tabular" label="GLM - Results from your community analysis on ${on_string}"/>
-        <data name="output_recap" from_work_dir="GLMSummaryFull.txt" format="txt" label="Simple statistics on chosen variables on ${on_string}"/>
+        <data name="output_plot" from_work_dir="plot.png" format="png" label="Plot - Temporal trends on ${on_string}"/>
+        <!--<collection type="list" name="plots">
+            <discover_datasets pattern="(?P&lt;designation&gt;.+)\.png" visible="false" format="png" directory="Output/plot/"/>
+        </collection>-->
     </outputs>
     <tests>
         <test> 
-            <param name="input_metric" value="Community_metrics_cropped.tabular"/>
-            <param name="input_unitobs" value="Unitobs.tabular"/>
-            <param name="varint" value="4"/>
-            <param name="varrep" value="year,site,habitat"/>
-            <param name="varrand" value="site"/>
-            <param name="sep" value="22"/>
-            <param name="advanced" value="simple"/>
-            <output name="output_summary" value="GLM_table_community_on_Community_metrics_cropped.tabular"/>
-            <output name="output_recap" value="Simple_statistics_on_Community_metrics_cropped.txt" lines_diff="2"/>
+            
         </test>
     </tests>
     <help><![CDATA[
-==============================================================
-Compute GLM on community data with selected interest variables
-==============================================================
+=============================================
+Compute GLM with selected interest variables
+=============================================
 
 **What it does**
 
@@ -101,7 +105,7 @@ The first input may be extracted from the 'Calculate community metrics' tool.
 A tabular file with unitobs or location data which contains at least as much columns as used response variables and separation factor in addition with the 'observation.unit' or 'location' column.
 
 +--------------------------------+---------+--------+------------+-----+       
-| observation.unit OR location   | ??site? |  year  |  habitat   | ... |            
+| observation.unit OR location   | ??site? |  year  |  habitat1  | ... |            
 +================================+=========+========+============+=====+        
 |  site_yearID     OR locationID | site ID |  2000  | habitatID  | ... |            
 +--------------------------------+---------+--------+------------+-----+        
