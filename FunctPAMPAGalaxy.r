@@ -952,7 +952,7 @@ sortiesLM.f <- function(objLM, TabSum, #formule,
         TabSum[TabSum[,colAna]==cut,"df.null"] <- sumLM$df.null
         TabCoef <- as.data.frame(sumLM$coefficients)
 
-        if (sumLM$family[1]=="gaussian") 
+        if (sumLM$family[1] == "gaussian" || sumLM$family[1] == "quasipoisson") 
         {
 
             TabCoef$signif <- lapply(TabCoef[,"Pr(>|t|)"],FUN=function(x){if(!is.na(x) && x < 0.05){"yes"}else{"no"}})
@@ -1074,7 +1074,7 @@ graphTitle.f <- function(metrique, modGraphSel, factGraph, listFact, model=NULL,
 
 ######################################### start of the function noteGLM.f called by modeleLineaireWP2.species.f and modeleLineaireWP2.unitobs.f
 
-noteGLM.f <- function(data, objLM, metric, listFact)
+noteGLM.f <- function(data, objLM, metric, listFact, details = FALSE)
 {
     ## Purpose: Note your GLM analysis
     ## ----------------------------------------------------------------------
@@ -1086,89 +1086,229 @@ noteGLM.f <- function(data, objLM, metric, listFact)
     ## Author: Coline ROYAUX, 26 june 2020
 
     rate <- 0
+    detres <- list(complete_plan=NA, balanced_plan=NA, NA_proportion_OK=NA, no_residual_dispersion=NA, uniform_residuals=NA, outliers_proportion_OK=NA, no_zero_inflation=NA, observation_factor_ratio_OK=NA, enough_levels_random_effect=NA, rate=NA)
 
-    #### Data criterias ####
+    #### Data criterions ####
     
     ## Plan
 
     plan <- as.data.frame(table(data[,listFact]))
 
-    if (nrow(plan[plan$Freq==0,]) < nrow(plan)*0.1 )    # +0.5 if less than 10% of possible factor's level combinations aren't represented in the sampling scheme
+    if (nrow(plan[plan$Freq==0,]) < nrow(plan)*0.1)    # +0.5 if less than 10% of possible factor's level combinations aren't represented in the sampling scheme
     { 
         rate <- rate + 0.5 
+        detres$complete_plan <- TRUE
 
         if (summary(as.factor(plan$Freq))[1] > nrow(plan)*0.9)  # +0.5 if the frequency of the most represented frequency of possible factor's levels combinations is superior to 90% of the total number of possible factor's levels combinations
         { 
             rate <- rate + 0.5
+            detres$balanced_plan <- TRUE
         }else{}
- 
-    }else{}  
+
+    }else{
+        detres$complete_plan <- FALSE
+        detres$balanced_plan <- FALSE
+    }  
 
     if (nrow(data) - nrow(na.omit(data)) < nrow(data)*0.1) # +1 if less than 10% of the lines in the dataframe bares a NA 
     {
         rate <- rate + 1
-    }else{}
+        detres$NA_proportion_OK <- TRUE
+    }else{
+        detres$NA_proportion_OK <- FALSE
+    }
 
-    #### Model criterias ####
+    #### Model criterions ####
+
+    if (length(grep("quasi",objLM$family)) == 0) #DHARMa doesn't work with quasi distributions
+    {
  
-    Residuals <- simulateResiduals(objLM)
+        Residuals <- simulateResiduals(objLM)
 
-    testRes <- testResiduals(Residuals)
-    testZero <- testZeroInflation(Residuals)
+        capture.output(testRes <- testResiduals(Residuals))
+        testZero <- testZeroInflation(Residuals)
 
-    ## dispersion of residuals
+        ## dispersion of residuals
 
-    if (testRes$dispersion$p.value > 0.05) # +1.5 if dispersion tests not significative 
-    {
-        rate <- rate + 1.5
-    }else{}
+        if (testRes$dispersion$p.value > 0.05) # +1.5 if dispersion tests not significative 
+        {
+            rate <- rate + 1.5
+            detres$no_residual_dispersion <- TRUE
+        }else{
+            detres$no_residual_dispersion <- FALSE
+        }
 
-    ## uniformity of residuals
+        ## uniformity of residuals
 
-    if (testRes$uniformity$p.value > 0.05) # +1 if uniformity tests not significative 
-    {
-        rate <- rate + 1.5
-    }else{}
+        if (testRes$uniformity$p.value > 0.05) # +1 if uniformity tests not significative 
+        {
+            rate <- rate + 1.5
+            detres$uniform_residuals <- TRUE
+        }else{
+            detres$uniform_residuals <- FALSE
+        }
 
-    ## residuals outliers
+        ## residuals outliers
+    
+        if (testRes$outliers$p.value > 0.05) # +0.5 if outliers tests not significative 
+        {
+            rate <- rate + 0.5
+            detres$outliers_proportion_OK <- TRUE
+        }else{
+            detres$outliers_proportion_OK <- FALSE
+        }
 
-    if (testRes$outliers$p.value > 0.05) # +0.5 if outliers tests not significative 
-    {
-        rate <- rate + 0.5
-    }else{}
+        ## Zero inflation test
 
-    ## Zero inflation test
+        if (testZero$p.value > 0.05) # +1 if zero inflation tests not significative 
+        {
+            rate <- rate + 1.5
+            detres$no_zero_inflation <- TRUE
+        }else{
+            detres$no_zero_inflation <- FALSE
+        }
 
-    if (testZero$p.value > 0.05) # +1 if dispersion tests not significative 
-    {
-        rate <- rate + 1.5
-    }else{}
+        ## Factors/observations ratio
 
-    ## Factors/observations ratio
+        if (length(listFact)/nrow(na.omit(data)) < 0.1) # +1 if quantity of factors is less than 10% of the quantity of observations
+        {
+            rate <- rate + 1
+            detres$observation_factor_ratio_OK <- TRUE
+        }else{
+            detres$observation_factor_ratio_OK <- FALSE
+        }
 
-    if (length(listFact)/nrow(na.omit(data)) < 0.1) # +1 if quantity of factors is less than 10% of the quantity of observations
-    {
-        rate <- rate + 1
-    }else{}
+        ## less than 10 factors' level on random effect
 
-    ## less than 10 factors' level on random effect
+        if (length(grep("^glmmTMB", objLM$call)) > 0)
+        {
+            nlevRand <- c()
+            for(fact in names(summary(objLM)$varcor$cond))
+            {
+                nlevRand <- c(nlevRand,length(unlist(unique(data[,fact]))))
+            }
+ 
+            if (all(nlevRand > 10)) # +1 if more than 10 levels in one random effect 
+            {
+                rate <- rate + 1
+                detres$enough_levels_random_effect <- TRUE
+            }else{
+                detres$enough_levels_random_effect <- FALSE
+            }
+        }else{}
+
+        detres$rate <- rate
+
+        if (details) 
+        {
+            return(detres)   
+        }else{
+            return(rate)
+        }
+
+    }else{
+        return(NA) 
+        cat("Models with quasi distributions can't be rated for now")
+    }
+}
+
+######################################### end of the function noteGLM.f
+
+######################################### start of the function noteGLMs.f called by modeleLineaireWP2.species.f and modeleLineaireWP2.unitobs.f
+
+noteGLMs.f <- function(tabRate, exprML, objLM, file_out=FALSE)
+{
+    ## Purpose: Note your GLM analysis
+    ## ----------------------------------------------------------------------
+    ## Arguments: data : rates table from noteGLM.f
+    ##            objLM : GLM assessed
+    ##            metric : selected metric
+    ##            listFact : Analysis factors list
+    ## ----------------------------------------------------------------------
+    ## Author: Coline ROYAUX, 26 june 2020
+
+    RateM <- mean(na.omit(tabRate[,"rate"]))
+    sum <- summary(objLM)
 
     if (length(grep("^glmmTMB", objLM$call)) > 0)
     {
-        nlevRand <- c()
-        for(fact in names(summary(objLM)$varcor$cond))
+        if (median(na.omit(tabRate[,"rate"])) >= 6) # if 50% has a rate superior or equal to 6 +1
         {
-            nlevRand <- c(nlevRand,length(unlist(unique(data[,fact]))))
-        }
+            RateM <- RateM + 1
+        } 
 
-        if (all(nlevRand > 10)) # +1 if more than 10 levels in one random effect 
+        if (quantile(na.omit(tabRate[,"rate"]), probs=0.9) >= 6) # if 90% has a rate superior or equal to 6 +1
         {
-            rate <- rate + 1
-        }else{}
-    }else{}
+            RateM <- RateM + 1
+        } 
+    }else{
+        if (median(na.omit(tabRate[,"rate"])) >= 5) # if 50% has a rate superior or equal to 5 +1
+        {
+            RateM <- RateM + 1
+        } 
 
-    return(rate)
+        if (quantile(na.omit(tabRate[,"rate"]), probs=0.9) >= 5) # if 90% has a rate superior or equal to 5 +1
+        {
+            RateM <- RateM + 1
+        } 
+    }
 
+    if (file_out)
+    {
+        namefile <- "RatingGLM.txt"
+
+        cat("###########################################################################",
+            "\n########################### Analysis evaluation ###########################",
+            "\n###########################################################################", file=namefile, fill=1,append=TRUE)
+
+        ## Informations on model :
+        cat("\n\n######################################### \nFitted model:", file=namefile, fill=1,append=TRUE)
+        cat("\t", deparse(exprML), "\n\n", file=namefile, sep="",append=TRUE)
+        cat("Family: ", sum$family[[1]], 
+            file=namefile,append=TRUE)
+        cat("\n\nNumber of analysis: ", nrow(tabRate), file=namefile, append=TRUE)
+
+        ## Global rate : 
+        cat("\n\n######################################### \nGlobal rate for all analysis:", 
+            "\n\n", RateM, "out of 10", file=namefile, append=TRUE)
+
+        ## details on every GLM : 
+#NA_proportion_OK=NA, no_residual_dispersion=NA, uniform_residuals=NA, outliers_proportion_OK=NA, no_zero_inflation=NA, observation_factor_ratio_OK=NA, enough_levels_random_effect=NA, rate=NA
+        cat("\n\n######################################### \nDetails on every analysis:\n\n", file=namefile, append=TRUE)
+        cat("Analysis\tC1\tC2\tC3\tC4\tC5\tC6\tC7\tC8\tFinal rate", file=namefile, append=TRUE)
+        apply(tabRate, 1, FUN=function(x)
+                              {
+                                  if (x["complete_plan"])
+                                  {
+                                      cat("\n",x[1],"\tyes", file=namefile, append=TRUE)
+                                  }else{
+                                      cat("\n",x[1],"\tno", file=namefile, append=TRUE)
+                                  }
+
+                                  for (i in c("NA_proportion_OK", "no_residual_dispersion", "uniform_residuals", "outliers_proportion_OK", "no_zero_inflation", "observation_factor_ratio_OK", "enough_levels_random_effect"))
+                                  { 
+                                      if (!is.na(x[i]) && x[i]==TRUE)
+                                      {
+                                          cat("\tyes", file=namefile, append=TRUE)
+                                      }else{
+                                          cat("\tno", file=namefile, append=TRUE)
+                                      }
+                                  }
+                                  
+                                  cat("\t",x["rate"], "/ 8", file=namefile, append=TRUE)
+
+                                             
+                              })
+        cat("\n\nC1: Complete plan?\nC2: Balanced plan?\nC3: Few NA?\nC4: Regular dispersion?\nC5: Uniform residuals?\nC6: Regular outliers proportion?\nC7: No zero-inflation?\nC8: Enough levels on random effect?", file=namefile, append=TRUE)
+
+        ## Red flags - advice :
+        cat("\n\n######################################### \nRed flags - advice:\n\n", file=namefile, append=TRUE)
+
+    }else{
+
+    return(RateM)
+
+    }
 }
 
 ######################################### end of the function noteGLM.f
