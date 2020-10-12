@@ -24,6 +24,10 @@
             <output name="output_presabs" value="Presence_absence_table_sansszcl_cropped.tabular"/>      
         </test>
     </tests>
+    <edam_topics>
+       <edam_topic>topic_0610</edam_topic>
+       <edam_topic>topic_3050</edam_topic>
+    </edam_topics>
     <help><![CDATA[
 ====================================================
 Calculate presence absence table from abundance data
@@ -58,7 +62,8 @@ OR
 |  ... |    ...   |      ...     |     ...    |
 +------+----------+--------------+------------+
 
-The data frame may also contain : 
+The data frame may also contain:
+ 
 - 'size.class' field with 'G' representing big individuals in given species, 'M'middle-sized individuals and 'P' small individuals
 - 'rotation' field for STAVIRO data
 

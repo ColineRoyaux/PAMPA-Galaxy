@@ -15,7 +15,7 @@
          'species.code'
          #if $settings.advanced=='advanced' 
              $settings.distrib
-             'FALSE'
+             $settings.Rdata
          #else
              'None'
              'FALSE'
@@ -24,6 +24,11 @@
          '$__tool_directory__/FunctPAMPAGalaxy.r' 
          '$output_summary'
          '$output_recap'
+         #if $settings.advanced=='advanced'
+             #if $settings.Rdata=='TRUE'
+                 '$output_GLM'
+             #end if
+         #end if
     ]]>
     </command>
     <inputs>
@@ -34,7 +39,6 @@
         </conditional>
     </inputs>
     <outputs>
-
         <data name="output_summary" from_work_dir="GLMSummary.tabular" format="tabular" label="GLM - Results from your population analysis on ${on_string}"/>
         <expand macro="pampa_output_GLM"/>
     </outputs>
@@ -53,11 +57,20 @@
             </output>
             <output name="output_recap">  
                 <assert_contents> 
-                    <has_n_lines n="614"/>
+                    <has_n_lines n="607"/>
                 </assert_contents> 
             </output>     
+            <output name="output_rate">
+                <assert_contents> 
+                    <has_n_lines n="46"/>
+                </assert_contents> 
+            </output>
         </test>
     </tests>
+    <edam_topics>
+       <edam_topic>topic_0610</edam_topic>
+       <edam_topic>topic_3050</edam_topic>
+    </edam_topics>
     <help><![CDATA[
 ===============================================================
 Compute GLM on population data with selected interest variables

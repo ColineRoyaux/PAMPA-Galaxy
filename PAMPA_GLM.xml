@@ -15,7 +15,7 @@
          '$sep'
          #if $settings.advanced=='advanced' 
              $settings.distrib
-             'FALSE'
+             $settings.Rdata
          #else
              'None'
              'FALSE'
@@ -24,6 +24,11 @@
          '$__tool_directory__/FunctPAMPAGalaxy.r' 
          '$output_summary'
          '$output_recap'
+         #if $settings.advanced=='advanced'
+             #if $settings.Rdata=='TRUE'
+                 '$output_GLM'
+             #end if
+         #end if
     ]]>
     </command>
     <inputs>
@@ -53,12 +58,21 @@
                 </assert_contents> 
             </output>
             <output name="output_recap">
+                <assert_contents>
+                    <has_n_lines n="413"/>
+                </assert_contents> 
+            </output>
+            <output name="output_rate">
                 <assert_contents> 
-                    <has_n_lines n="420"/>
+                    <has_n_lines n="51"/>
                 </assert_contents> 
             </output>
         </test>
     </tests>
+    <edam_topics>
+       <edam_topic>topic_0610</edam_topic>
+       <edam_topic>topic_3050</edam_topic>
+    </edam_topics>
     <help><![CDATA[
 ==============================================================
 Compute GLM on community data with selected interest variables

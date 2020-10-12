@@ -1,0 +1,139 @@
+<tool id="pampa_plotglm" name="Create a plot from GLM data" version="@VERSION@">
+    <description>With variables of your choice</description>
+    <macros>
+        <import>pampa_macros.xml</import>
+    </macros>
+    <expand macro="Plot_requirements"/>
+    <command detect_errors="exit_code"><![CDATA[
+        Rscript 
+         '$__tool_directory__/FunctExePlotGLMGalaxy.r' 
+         '$input'
+         '$datatable'
+         '$unitobstable'
+         '$distrib'
+         '$__tool_directory__/FunctPAMPAGalaxy.r' 
+         '$plots'
+    ]]>
+    </command>
+    <inputs>
+        <param name="input" type="data" format="tabular" label="Input glm results file" help=""/>
+        <param name="datatable" type="data" format="tabular" label="Data table used for glm" help=""/>
+        <param name="unitobstable" type="data" format="tabular" label="Unitobs table used for glm" help=""/>
+        <param name="distrib" type="select" label="Distribution of model">
+            <option value="gaussian">Gaussian</option>
+            <option value="inverse.gaussian">Inverse Gaussian</option>
+            <option value="poisson">Poisson</option>
+            <option value="quasipoisson">Quasi-Poisson</option>
+            <option value="binomial">Binomial</option>
+            <option value="quasibinomial">Quasi-Binomial</option>
+            <option value="Gamma">Gamma</option>
+            </param>
+    </inputs>
+    <outputs>
+       <!--<data name="output_plot" from_work_dir="Abalstel_.png" format="png" label="Plot - Temporal trends on ${on_string}"/>-->
+       <collection type="list" name="plots">
+            <discover_datasets pattern="(?P&lt;designation&gt;.+)\.png" visible="false" format="png"/>
+       </collection>
+       <data name="err" label="Error" format="txt"/>
+    </outputs>
+    <tests>
+        <test> 
+            <param name="input" value="GLM_table_population_analysis_on_Presence_absence_sansszcl_cropped.tabular"/>
+            <param name="input" value="Presence_absence_table_sansszcl_cropped.tabular"/>
+            <param name="distrib" value="gaussian"/>
+            <output_collection name="plots"  type="list" count="3">
+                <element name="Abalstel">
+                    <assert_contents>
+                        <has_text text="PNG"/>
+                    </assert_contents>
+                </element>
+                <element name="Hemifasc">
+                    <assert_contents>
+                        <has_text text="PNG"/>
+                    </assert_contents>
+                </element>
+                <element name="Zebrscop">
+                    <assert_contents>
+                        <has_text text="PNG"/>
+                    </assert_contents>
+                </element>
+            </output_collection>
+        </test>
+    </tests>
+    <help><![CDATA[
+=============================================
+Compute GLM with selected interest variables
+=============================================
+
+**What it does**
+
+This tool from PAMPA toolsuite computes Generalized Linear Models on community data. 
+
+It allows user to choose composition of the model :
+
+- Interest variable among numeric or integer variables of the input file
+
+- Response variables among year, site and/or habitat
+
+- Allocation of random effect on year and/or site
+
+|
+
+**Input description**
+
+A tabular file with community data. Must at least contain two or three columns depending on the case : 
+
+- ['year' and 'location'] or ['observation.unit'] 
+
+- At least one community metric 
+
++------------------+---------+---------+-----+       
+| observation.unit | metric1 | metric2 | ... |            
++==================+=========+=========+=====+        
+|   site_yearID    |    2    |   0.4   | ... |            
++------------------+---------+---------+-----+        
+|        ...       |   ...   |   ...   | ... |       
++------------------+---------+---------+-----+           
+
+OR
+
++------+----------+---------+---------+-----+
+| year | location | metric1 | metric2 | ... |
++======+==========+=========+=========+=====+
+| 2000 |locationID|    2    |   0.4   | ... |
++------+----------+---------+---------+-----+
+|  ... |    ...   |   ...   |   ...   | ... |
++------+----------+---------+---------+-----+
+
+The first input may be extracted from the 'Calculate community metrics' tool.
+
+A tabular file with unitobs or location data which contains at least as much columns as used response variables and separation factor in addition with the 'observation.unit' or 'location' column.
+
++--------------------------------+---------+--------+------------+-----+       
+| observation.unit OR location   | ??site? |  year  |  habitat1  | ... |            
++================================+=========+========+============+=====+        
+|  site_yearID     OR locationID | site ID |  2000  | habitatID  | ... |            
++--------------------------------+---------+--------+------------+-----+        
+|              ...               |   ...   |   ...  |     ...    | ... |       
++--------------------------------+---------+--------+------------+-----+ 
+
+|
+
+**Output**
+
+Two text files : 
+
+- A first text file with GLM results. When a separation factor is selected, one analysis is computed for every level and the last analysis is on the whole dataset.
+
+- A second text file with simple statistics on the whole dataset.
+
+|
+
+**Source**
+
+Derived from PAMPA scripts (https://wwz.ifremer.fr/pampa/Meth.-Outils/Outils) written by Yves Reecht.
+
+  ]]></help>
+
+  <expand macro="pampa_bibref" />
+</tool>

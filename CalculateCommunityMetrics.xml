@@ -32,6 +32,10 @@
             <output name="output_community" value="Community_metrics_cropped.tabular"/>
         </test>
     </tests>
+    <edam_topics>
+       <edam_topic>topic_0610</edam_topic>
+       <edam_topic>topic_3050</edam_topic>
+    </edam_topics>
     <help><![CDATA[
 ===============================================
 Calculate community metrics from abundance data
@@ -39,13 +43,13 @@ Calculate community metrics from abundance data
 
 **What it does**
 
-This tool from PAMPA toolsuite computes community metrics from abundance data.
+This tool from PAMPA toolsuite computes community metrics from abundance data:
+
 - Specific richness
 - Shannon index
 - Simpson index
 - Pielou index
 - Hill index
-- Relative richness
 
 |
 
@@ -72,7 +76,8 @@ OR
 |  ... |    ...   |      ...     |     ...    |
 +------+----------+--------------+------------+
 
-The data frame may also contain : 
+The data frame may also contain: 
+
 - 'size.class' field with 'G' representing big individuals in given species, 'M' middle-sized individuals and 'P' small individuals
 - 'rotation' field for STAVIRO data
 
