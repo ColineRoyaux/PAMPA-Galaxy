@@ -892,7 +892,7 @@ subsetToutesTables.f <- function(metrique, tabMetrics, facteurs, selections,
 
 
 ######################################### start of the function create.res.table called by modeleLineaireWP2.xxx.f in FunctExeCalcGLMxxGalaxy.r
-create.res.table <- function(listRand, listFact, row, lev)
+create.res.table <- function(listRand, listFact, row, lev, distrib)
 {
     ## Purpose: create results table
     ## ----------------------------------------------------------------------
@@ -900,6 +900,7 @@ create.res.table <- function(listRand, listFact, row, lev)
     ##            listFact : Analysis factors list
     ##            row : rows of results table = species or separation factor
     ##            lev : Levels of analysis factors list
+    ##            distrib : distribution law
     ## ----------------------------------------------------------------------
     ## Author: Coline ROYAUX 04 october 2020
 
@@ -928,7 +929,7 @@ create.res.table <- function(listRand, listFact, row, lev)
     }else{ ## if no random effects
         TabSum <- data.frame(analysis=row,Interest.var=NA,distribution=NA,AIC=NA,Resid.deviance=NA,df.resid=NA,Null.deviance=NA,df.null=NA)
 
-        switch(loiChoisie,
+        switch(distrib,
                "gaussian"={colcoef <- unlist(lapply(c("(Intercept)",lev),
                                              FUN=function(x){lapply(c("Estimate","Std.Err","Tvalue","Pvalue","IC_up","IC_inf","signif"),
                                                                     FUN=function(y){paste(x,y,collapse = ":")
@@ -982,9 +983,9 @@ sortiesLM.f <- function(objLM, objLMY, TabSum, #formule,
     ## ----------------------------------------------------------------------
     ## Author: Yves Reecht, Date: 25 août 2010, 16:19 modified by Coline ROYAUX 04 june 2020
 
-    TabSum[,"Interest.var"] <- rep(metrique,nrow(TabSum))
-    TabSum[,"distribution"] <- rep(sumLM$family[1],nrow(TabSum))
+    TabSum[,"Interest.var"] <- as.character(metrique)#rep(,nrow(TabSum))
     sumLM <- summary(objLM)
+    TabSum[,"distribution"] <- as.character(sumLM$family[1])#rep(,nrow(TabSum))
 
     if (length(grep("^glmmTMB", objLM$call)) > 0) #if random effects
     {
@@ -1010,7 +1011,6 @@ sortiesLM.f <- function(objLM, objLMY, TabSum, #formule,
                 sumLMY <- summary(objLMY)
                 TabCoefY <- as.data.frame(sumLMY$coefficients$cond)
                 TabCoefY$signif <- lapply(TabCoefY[,"Pr(>|z|)"],FUN=function(x){if(!is.na(x) && x < 0.05){"yes"}else{"no"}})
-
                 TabSum[TabSum[,colAna]==cut,"year Zvalue"] <- ifelse(length(TabCoefY["year","z value"]) > 0,TabCoefY["year","z value"],NA)
                 TabSum[TabSum[,colAna]==cut,"year Pvalue"] <- ifelse(length(TabCoefY["year","Pr(>|z|)"]) > 0,TabCoefY["year","Pr(>|z|)"],NA)
             }else{}
@@ -1096,7 +1096,7 @@ sortiesLM.f <- function(objLM, objLMY, TabSum, #formule,
         }else{}
 
     }else{}
-    
+
     IC <- tryCatch(as.data.frame(confint(objLM)), error=function(e){})
 
     TabSum[TabSum[,colAna]==cut,grepl(paste(lev,"IC_up",collapse="|"),colnames(TabSum))] <- unlist(lapply(lev,FUN=function(x){if (length(grep(x,rownames(IC))) > 0) {IC[grepl(x,rownames(IC)),"97.5 %"]}else{NA}})) 

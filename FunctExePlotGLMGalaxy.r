@@ -22,8 +22,7 @@ if (length(args) < 2) {
     Importdata <- args[1] ###### file name : glm results table
     DataTab <- args[2]
     UnitobsTab <- args[3]
-    distrib <- args[4]
-    source(args[5]) ###### Import functions
+    source(args[4]) ###### Import functions
 
 }
 #### Data must be a dataframe with at least 3 variables : unitobs representing location and year ("observation.unit"), species code ("species.code") and abundance ("number")
@@ -34,9 +33,13 @@ glmtable <- read.table(Importdata,sep="\t",dec=".",header=TRUE,encoding="UTF-8")
 datatable <- read.table(DataTab,sep="\t",dec=".",header=TRUE,encoding="UTF-8") #
 unitobs <- read.table(UnitobsTab,sep="\t",dec=".",header=TRUE,encoding="UTF-8") #
 
-#vars_data1<- NULL
-#err_msg_data1<-"The input metrics dataset doesn't have the right format. It needs to have at least the following 2 variables :\n- observation.unit (or year and site)\n- numeric or integer metric\n"
-#check_file(obs,err_msg_data1,vars_data1,2)
+vars_data1 <- c("analysis","Interest.var","distribution")
+err_msg_data1<-"The input GLM results dataset doesn't have the right format. It needs to have at least the following 3 variables :\n- analysis\n- Interest.var\n- distribution\n"
+check_file(glmtable,err_msg_data1,vars_data1,4)
+
+if (length(grep("[0-2][0|9][0-9][0-9].Estimate",colnames(glmtable))) == 0){stop("The input GLM results dataset doesn't have the right format or informations. This tool is to represent temporal trends, if your GLM doesn't take the year variable as a fixed effect this tool is not proper to make any representation of it. It needs to have at least estimates of every year from your time series GLM as columns with name formated as : yyyy Estimate (example : 2020 Estimate).")}
+
+
 
 ####################################################################################################
 ######################### Creating plot community ## Function : CommPlot.f #########################
@@ -46,13 +49,14 @@ unitobs <- read.table(UnitobsTab,sep="\t",dec=".",header=TRUE,encoding="UTF-8") 
        
 
 ############################################################################################################ fonction graphique appelée par main.glm / function called by main.glm for graphical output
-ggplot.glm <- function(glmtable, datatable,unitobs,serie=NULL,sp,description=TRUE,distrib,
+ggplot.glm <- function(glmtable, datatable,unitobs,serie=NULL,sp,description=TRUE,
                           tendanceSurFigure=TRUE,seuilOccu=14,assessIC=TRUE) 
 {
 
     seuilSignif <- 0.05
     metric <- as.character(glmtable[1,"Interest.var"])
-    col <- c("observation.unit",metric)
+    distrib <- as.character(glmtable[1,"distribution"])
+    col <- c("observation.unit","location",metric)
 
     if (colnames(glmtable)[length(glmtable)]=="separation")
     {
@@ -61,10 +65,14 @@ ggplot.glm <- function(glmtable, datatable,unitobs,serie=NULL,sp,description=TRU
         {
             datatable <- cbind(datatable[,col], unitobs[match(datatable[,"observation.unit"],unitobs[,"observation.unit"]),c("year",cut)])
             colnames(datatable) <- c(col,"year",cut)
+        }else{
+            datatable <- cbind(datatable[,col], unitobs[match(datatable[,"observation.unit"],unitobs[,"observation.unit"]),"year"])
+            colnames(datatable) <- c(col,"year")
         }
 
     }else{
         cut <- "species.code"
+        col <- c(col,cut)
         datatable <- cbind(datatable[,col], unitobs[match(datatable[,"observation.unit"],unitobs[,"observation.unit"]),"year"])
         colnames(datatable) <- c(col,"year")
     }
@@ -220,21 +228,19 @@ ggplot.glm <- function(glmtable, datatable,unitobs,serie=NULL,sp,description=TRU
         datatablecut <- datatable[grep("FALSE",is.na(datatable[,as.character(metric)])),]
 
     }else{
+
         datatablecut <- datatable[datatable[,as.character(cut)]==sp,]
         datatablecut <- datatablecut[grep("FALSE",is.na(datatablecut[,as.character(metric)])),]
     }
 
-
-  #  datatablecut <- subset(datatablecut,year == year)
-
     switch(as.character(metric),
            "number" = {valplot <- lapply(sort(year), FUN=function(x){sum(na.omit(as.numeric(subset(datatablecut, year==x)[,as.character(metric)])))})},
            "pres.abs" = {nb_loc <- lapply(sort(year), FUN=function(x){length(unique(subset(datatablecut,year == x)[,"location"]))}) ## nb_loc nombre de loc suivie par year / number of plots per year
-                         nb_loc_presence <- lapply(sort(year), FUN=function(x){length(unique(subset(datatablecut[datatablecut$number > 0,], year == x)[,"location"]))}) ## nb_loc_presence nombre de location de presence par year / number the plots where the species were observed
+                         nb_loc_presence <- lapply(sort(year), FUN=function(x){length(unique(subset(datatablecut[datatablecut[,metric] > 0,], year == x)[,"location"]))}) ## nb_loc_presence nombre de location de presence par year / number the plots where the species were observed
                          valplot <- (na.omit(as.numeric(nb_loc_presence)) / na.omit(as.numeric(nb_loc)))*100},
            {valplot <- lapply(sort(year), FUN=function(x){mean(na.omit(as.numeric(subset(datatablecut, year==x)[,as.character(metric)])))})}
           )
-   # if(sp=="HR"){stop(unique(datatablecut$year))}
+
     tab2 <- data.frame(year,val = round(as.numeric(valplot),2),
                        LL=NA,UL=NA,catPoint=NA,pval=NA,
                        courbe=vpan[2],
@@ -352,10 +358,10 @@ ggplot.glm <- function(glmtable, datatable,unitobs,serie=NULL,sp,description=TRU
 for (sp in glmtable[,1]) 
 {
 
-    if (!all(is.na(glmtable[glmtable[,1]==sp,3:(length(glmtable)-1)]))) ##ignore lines with only NA
+    if (!all(is.na(glmtable[glmtable[,1]==sp,4:(length(glmtable)-1)]))) ##ignore lines with only NA
     { 
         #p <- 
-        ggplot.glm(glmtable = glmtable, datatable=datatable,unitobs=unitobs, serie=NULL, sp=sp, description=TRUE, distrib=distrib, tendanceSurFigure=TRUE, seuilOccu=14, assessIC=TRUE)
+        ggplot.glm(glmtable = glmtable, datatable=datatable,unitobs=unitobs, serie=NULL, sp=sp, description=TRUE, tendanceSurFigure=TRUE, seuilOccu=14, assessIC=TRUE)
         #plots <- list(plots,p)
     }
 }

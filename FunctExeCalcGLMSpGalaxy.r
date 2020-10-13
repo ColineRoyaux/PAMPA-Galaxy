@@ -146,11 +146,11 @@ modeleLineaireWP2.species.f <- function(metrique, listFact, listRand, FactAna, D
     lev <- unlist(lapply(listF,FUN=function(x){levels(tmpData[,x])}))
     row <- levels(tmpData[,FactAna])
 
-    if (is.element("year",listFact) && ! is.element("year",listRand))
+    if (is.element("year",listF) && ! is.element("year",listRand))
     {
-        TabSum <- create.res.table(listRand=listRand, listFact=listFact, row=row, lev=unlist(c("year",lev)))
+        TabSum <- create.res.table(listRand=listRand, listFact=listFact, row=row, lev=unlist(c("year",lev)), distrib=loiChoisie)
     }else{
-        TabSum <- create.res.table(listRand=listRand, listFact=listFact, row=row, lev=lev)
+        TabSum <- create.res.table(listRand=listRand, listFact=listFact, row=row, lev=lev, distrib=loiChoisie)
     }
     ### creating rate table 
     TabRate <- data.frame(species=row, complete_plan=NA, balanced_plan=NA, NA_proportion_OK=NA, no_residual_dispersion=NA, uniform_residuals=NA, outliers_proportion_OK=NA, no_zero_inflation=NA, observation_factor_ratio_OK=NA, enough_levels_random_effect=NA, rate=NA)
@@ -168,7 +168,8 @@ modeleLineaireWP2.species.f <- function(metrique, listFact, listRand, FactAna, D
         if (listRand[1] != "None")
         {
             res <- tryCatch(glmmTMB(exprML,family=loiChoisie, data=cutData), error=function(e){})
-            if (is.element("year",listFact)) #Model with year as continuous
+
+            if (is.element("year",listF) && ! is.element("year",listRand)) #Model with year as continuous
             { 
                 cutData$year <- as.numeric(cutData$year)
                 resY <- tryCatch(glmmTMB(exprML,family=loiChoisie, data=cutData), error=function(e){})
@@ -176,7 +177,7 @@ modeleLineaireWP2.species.f <- function(metrique, listFact, listRand, FactAna, D
             }else{resY <- ""}
         }else{
             res <- tryCatch(glm(exprML,data=cutData,family=loiChoisie), error=function(e){})
-            if (is.element("year",listFact)) #Model with year as continuous
+            if (is.element("year",listF)) #Model with year as continuous
             { 
                 cutData$year <- as.numeric(cutData$year)
                 resY <- tryCatch(glm(exprML,family=loiChoisie, data=cutData), error=function(e){})
