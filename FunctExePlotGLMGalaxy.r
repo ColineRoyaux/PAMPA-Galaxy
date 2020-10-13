@@ -20,92 +20,107 @@ if (length(args) < 2) {
 
 } else {
     Importdata <- args[1] ###### file name : glm results table
-    DataTab <- args[2]
-    UnitobsTab <- args[3]
+    DataTab <- args[2] ###### file name : Metrics table
+    UnitobsTab <- args[3] ###### file name : Unitobs table
     source(args[4]) ###### Import functions
 
 }
-#### Data must be a dataframe with at least 3 variables : unitobs representing location and year ("observation.unit"), species code ("species.code") and abundance ("number")
 
-
-#Import des données / Import data 
+#Import data 
 glmtable <- read.table(Importdata,sep="\t",dec=".",header=TRUE,encoding="UTF-8") #
 datatable <- read.table(DataTab,sep="\t",dec=".",header=TRUE,encoding="UTF-8") #
 unitobs <- read.table(UnitobsTab,sep="\t",dec=".",header=TRUE,encoding="UTF-8") #
+
+#Check files
 
 vars_data1 <- c("analysis","Interest.var","distribution")
 err_msg_data1<-"The input GLM results dataset doesn't have the right format. It needs to have at least the following 3 variables :\n- analysis\n- Interest.var\n- distribution\n"
 check_file(glmtable,err_msg_data1,vars_data1,4)
 
-if (length(grep("[0-2][0|9][0-9][0-9].Estimate",colnames(glmtable))) == 0){stop("The input GLM results dataset doesn't have the right format or informations. This tool is to represent temporal trends, if your GLM doesn't take the year variable as a fixed effect this tool is not proper to make any representation of it. It needs to have at least estimates of every year from your time series GLM as columns with name formated as : yyyy Estimate (example : 2020 Estimate).")}
+if (length(grep("[0-2][0|9][0-9][0-9].[Estimate|Pvalue]",colnames(glmtable))) == 0){stop("The input GLM results dataset doesn't have the right format or informations. This tool is to represent temporal trends, if your GLM doesn't take the year variable as a fixed effect this tool is not proper to make any representation of it. It needs to have at least estimates and p-value for every year from your time series GLM as columns with name formated as : yyyy Estimate (example : 2020 Estimate) and  yyyy Pvalue (example : 2020 Pvalue).")}
 
+if (length(grep("[0-2][0|9][0-9][0-9].IC_[up|inf]",colnames(glmtable))) == 0){assessIC <- FALSE}else{assessIC <- TRUE}
 
+metric <- as.character(glmtable[1,"Interest.var"])
 
-####################################################################################################
-######################### Creating plot community ## Function : CommPlot.f #########################
-####################################################################################################
+vars_data2 <- c("observation.unit","location",metric)
+err_msg_data2<-"The input metrics dataset doesn't have the right format. It needs to have at least the following 3 variables :\n- observation.unit\n- location\n- the name of the interest metric\n"
+check_file(datatable,err_msg_data2,vars_data2,4)
 
+vars_data3 <- c("observation.unit","year")
+err_msg_data3<-"The input unitobs dataset doesn't have the right format. It needs to have at least the following 2 variables :\n- observation.unit\n- year\n"
+check_file(unitobs,err_msg_data3,vars_data3,2)
+if(length(grep("[0-2][0|9][0-9][0-9]",unitobs$year)) == 0){stop("The year column in the input unitobs dataset doesn't have the right format. Years must be fully written as : yyyy (example : 2020).")}
 
-       
+if (all(is.na(match(datatable[,"observation.unit"],unitobs[,"observation.unit"])))) {stop("Observation units doesn't match in the inputs metrics dataset and unitobs dataset")}
 
-############################################################################################################ fonction graphique appelée par main.glm / function called by main.glm for graphical output
-ggplot.glm <- function(glmtable, datatable,unitobs,serie=NULL,sp,description=TRUE,
-                          tendanceSurFigure=TRUE,seuilOccu=14,assessIC=TRUE) 
+####################################################################################################################
+######################### Creating plot from time series GLM data ## Function : ggplot.glm #########################
+####################################################################################################################
+ggplot.glm <- function(glmtable, datatable,unitobs,metric=metric,sp,description=TRUE,
+                       trendOnGraph=TRUE,assessIC=TRUE) 
 {
+    ## Purpose: Creating plot from time series GLM data
+    ## ----------------------------------------------------------------------
+    ## Arguments: glmtable : GLM(s) results table
+    ##            datatable : Metrics table
+    ##            unitobs : Unitobs table
+    ##            metric : Interest variable in GLM(s)
+    ##            sp : name of processed GLM
+    ##            description : Two graphs ? 
+    ##            trendOnGraph : Write global trend of the time series on graph ? 
+    ##            assessIC : Assess confidence intervals ?
+    ## ----------------------------------------------------------------------
+    ## Author: Coline ROYAUX 13 october 2020
 
-    seuilSignif <- 0.05
-    metric <- as.character(glmtable[1,"Interest.var"])
-    distrib <- as.character(glmtable[1,"distribution"])
-    col <- c("observation.unit","location",metric)
+    seuilSignif <- 0.05 ## threshold when pvalue is considered significant
+    distrib <- as.character(glmtable[1,"distribution"]) ## extract GLM distribution
 
-    if (colnames(glmtable)[length(glmtable)]=="separation")
+    col <- c("observation.unit","location",metric) ## names of needed columns in metrics table to construct the 2nd panel of the graph
+
+    if (colnames(glmtable)[length(glmtable)]=="separation") ## if GLM is a community analysis
     {
         cut <- as.character(glmtable[1,"separation"])
-        if(cut != "None")
+        if(cut != "None") ## if there is plural GLM analysis performed 
         {
-            datatable <- cbind(datatable[,col], unitobs[match(datatable[,"observation.unit"],unitobs[,"observation.unit"]),c("year",cut)])
+            datatable <- cbind(datatable[,col], unitobs[match(datatable[,"observation.unit"],unitobs[,"observation.unit"]),c("year",cut)]) ## extracting 'year' and analysis separation factor columns from unitobs table to merge with metrics table /// Matching lines with 'observation.unit' column 
             colnames(datatable) <- c(col,"year",cut)
         }else{
-            datatable <- cbind(datatable[,col], unitobs[match(datatable[,"observation.unit"],unitobs[,"observation.unit"]),"year"])
+            datatable <- cbind(datatable[,col], unitobs[match(datatable[,"observation.unit"],unitobs[,"observation.unit"]),"year"]) ## extracting 'year' column from unitobs table to merge with metrics table /// Matching lines with 'observation.unit' column 
             colnames(datatable) <- c(col,"year")
         }
 
-    }else{
+    }else{ ## GLM is a population analysis
         cut <- "species.code"
         col <- c(col,cut)
-        datatable <- cbind(datatable[,col], unitobs[match(datatable[,"observation.unit"],unitobs[,"observation.unit"]),"year"])
+        datatable <- cbind(datatable[,col], unitobs[match(datatable[,"observation.unit"],unitobs[,"observation.unit"]),"year"]) ## extracting 'year' column from unitobs table to merge with metrics table /// Matching lines with 'observation.unit' column 
         colnames(datatable) <- c(col,"year")
     }
 
-    ##vpan vecteur des panels de la figure  ###### POUR FAIRE LES GRAPHIQUES
+    ##vpan vector of names of the two panels in the ggplot 
+
     switch(as.character(metric),
            "number" = vpan <- c("Abundance variation","Raw abundance"),
            "pres.abs" = vpan <- c("Presence-absence variation","% presence in location"),
            vpan <- c(paste(metric," variation"),paste("Mean ", metric)))
 
-    ##Cut table for 1 species
-    glmtab <- glmtable[glmtable[,1]==sp,]
+    ##Cut table for 1 analysis
+    glmtab <- glmtable[glmtable[,"analysis"]==sp,] 
 
-    glmtab <- glmtab[,grep("FALSE",is.na(glmtab[1,]))]
-    ## specifications des variables temporelles necesaires pour les analyses / specification of temporal variable necessary for the analyses
+    glmtab <- glmtab[,grep("FALSE",is.na(glmtab[1,]))] ## Supress columns with NA only
+
+    ## specification of temporal variable necessary for the analyses
     an <- as.numeric(unlist(strsplit(gsub("X","",paste(colnames(glmtab)[grep("[0-2][0|9][0-9][0-9].Estimate",colnames(glmtab))],collapse=" ")),split=".Estimate")))
 
     year <- sort(c(min(an)-1,an))
     nbans <- length(year)
     pasdetemps <- nbans-1
-    firstY <- min(year)
-    lastY <- max(year)
-	
-    nbSp <- length(glmtable[,1])
 
     coefan <- glmtab[glmtab[,1]==sp,grep("[0-2][0|9][0-9][0-9].Estimate",colnames(glmtab))] ## tendences sur la periode = coefficient regression de variable year  / tendency of
     coefan <- unlist(coefan[grep("FALSE",is.na(coefan))])
-    erreuran <- glmtab[glmtab[,1]==sp,grep("[0-2][0|9][0-9][0-9].Std.Err",colnames(glmtab))]
-    erreuran <- unlist(erreuran[grep("FALSE",is.na(erreuran))]) #### erreur standard sur le coefficient de regression de la variable year  / standard error on the regression coefficient of the year 
-
+   
     switch(distrib,
            "poisson"={coefyear <- c(1,exp(as.numeric(coefan)))
-                      erreuryear1 <- c(0,as.numeric(erreuran)*exp(as.numeric(coefan)))
                       if(assessIC) 
                       {
                           ic_inf_sim <- c(1,exp(as.numeric(glmtab[glmtab[,1]==sp,grep("[0-2][0|9][0-9][0-9].IC_inf",colnames(glmtab))])))
@@ -115,7 +130,6 @@ ggplot.glm <- function(glmtable, datatable,unitobs,serie=NULL,sp,description=TRU
                           ic_sup_sim <- NA
                       }},
            "quasipoisson"={coefyear <- c(1,exp(as.numeric(coefan)))
-                           erreuryear1 <- c(0,as.numeric(erreuran)*exp(as.numeric(coefan)))
                            if(assessIC) 
                            {
                                ic_inf_sim <- c(1,exp(as.numeric(glmtab[glmtab[,1]==sp,grep("[0-2][0|9][0-9][0-9].IC_inf",colnames(glmtab))])))
@@ -125,7 +139,6 @@ ggplot.glm <- function(glmtable, datatable,unitobs,serie=NULL,sp,description=TRU
                                ic_sup_sim <- NA
                            }},
            "inverse.gaussian"={coefyear <- c(1,as.numeric(coefan)^(-1/2))
-                               erreuryear1 <- c(0,as.numeric(erreuran)*(as.numeric(coefan)^(-1/2)))
                                if(assessIC) 
                                {
                                    ic_inf_sim <- c(1,as.numeric(glmtab[glmtab[,1]==sp,grep("[0-2][0|9][0-9][0-9].IC_inf",colnames(glmtab))])^(-1/2))
@@ -135,7 +148,6 @@ ggplot.glm <- function(glmtable, datatable,unitobs,serie=NULL,sp,description=TRU
                                    ic_sup_sim <- NA
                                }},
            "binomial"={coefyear <- c(1,inv.logit(as.numeric(coefan)))
-                       erreuryear1 <- c(0,as.numeric(erreuran)*inv.logit(as.numeric(coefan)))
                        if(assessIC) 
                        {
                            ic_inf_sim <- c(1,inv.logit(as.numeric(glmtab[glmtab[,1]==sp,grep("[0-2][0|9][0-9][0-9].IC_inf",colnames(glmtab))])))
@@ -145,7 +157,6 @@ ggplot.glm <- function(glmtable, datatable,unitobs,serie=NULL,sp,description=TRU
                            ic_sup_sim <- NA
                        }},
            "quasibinomial"={coefyear <- c(1,inv.logit(as.numeric(coefan)))
-                            erreuryear1 <- c(0,as.numeric(erreuran)*inv.logit(as.numeric(coefan)))
                             if(assessIC) 
                             {
                                 ic_inf_sim <- c(1,inv.logit(as.numeric(glmtab[glmtab[,1]==sp,grep("[0-2][0|9][0-9][0-9].IC_inf",colnames(glmtab))])))
@@ -155,7 +166,6 @@ ggplot.glm <- function(glmtable, datatable,unitobs,serie=NULL,sp,description=TRU
                                 ic_sup_sim <- NA
                             }},
            "Gamma"={coefyear <- c(1,as.numeric(coefan)^(-1))
-                    erreuryear1 <- c(0,as.numeric(erreuran)*(as.numeric(coefan)^(-1)))
                     if(assessIC) 
                     {
                         ic_inf_sim <- c(1,as.numeric(glmtab[glmtab[,1]==sp,grep("[0-2][0|9][0-9][0-9].IC_inf",colnames(glmtab))])^(-1))
@@ -165,7 +175,6 @@ ggplot.glm <- function(glmtable, datatable,unitobs,serie=NULL,sp,description=TRU
                         ic_sup_sim <- NA
                     }},
            {coefyear <- c(1,as.numeric(coefan))
-            erreuryear1 <-  c(0,as.numeric(erreuran)*as.numeric(coefan))## erreur standard par année / the standard error per year
             if(assessIC) 
             {
                 ic_inf_sim <- c(1,as.numeric(glmtab[glmtab[,1]==sp,grep("[0-2][0|9][0-9][0-9].IC_inf",colnames(glmtab))]))
@@ -210,8 +219,6 @@ ggplot.glm <- function(glmtable, datatable,unitobs,serie=NULL,sp,description=TRU
             pourcentage <-  round((((as.numeric(coefancontinu)*as.numeric(pasdetemps)))-1)*100,2)})
         
     pval <- as.numeric(as.character(glmtab[glmtab[,1]==sp,grep("year.Pvalue",colnames(glmtab))]))
-        
-    erreuran <- as.numeric(as.character(glmtab[glmtab[,1]==sp,grep("year.Std.Err",colnames(glmtab))])) #### récuperer l'erreur standard / retrieve the error 
 
     ## tab1t table utile pour la realisation des figures  / table used for the figures
     tab1t <- NULL
@@ -273,13 +280,13 @@ ggplot.glm <- function(glmtable, datatable,unitobs,serie=NULL,sp,description=TRU
                                                    abs(tab1t$pourcent)," % in ",pasdetemps," years",sep=""),"")
         }
     }else{
-        tendanceSurFigure <- FALSE
+        trendOnGraph <- FALSE
     }
 
   ## table du texte de la tendance / table of the text for the population evolution trend
     tabTextPent <- data.frame(y=c(max(c(dgg$val,dgg$UL),na.rm=TRUE)*.9),
                               x=median(dgg$year),
-                              txt=ifelse(tendanceSurFigure,c(txtPente1),""),
+                              txt=ifelse(trendOnGraph,c(txtPente1),""),
                               courbe=c(vpan[1]),panel=c(vpan[1]))
     dgg <- rbind(tab1,tab2)
   ## les couleurs / the colors
@@ -317,7 +324,6 @@ ggplot.glm <- function(glmtable, datatable,unitobs,serie=NULL,sp,description=TRU
     p <- p + geom_point(mapping=aes(colour=catPoint,alpha=ifelse(!is.na(catPoint),1,0)),size = 2)
     p <-  p + geom_text(data=tabTextPent, mapping=aes(x,y,label=txt) ,parse=FALSE,color=col[vpan[1]],fontface=2, size=4)
     ggsave(figname, p,width=16,height=15, units="cm")
-	#print (figname)  ##### CAN BE REMOVED IF YOU DO NOT WANT THE GRAPH TO BE PLOTTED
 
   } else {
 
@@ -344,7 +350,6 @@ ggplot.glm <- function(glmtable, datatable,unitobs,serie=NULL,sp,description=TRU
     p <- p + geom_point(mapping=aes(colour=catPoint,alpha=ifelse(!is.na(catPoint),1,0)),size = 2)
     p <-  p + geom_text(data=tabTextPent, mapping=aes(x,y,label=txt),parse=FALSE,color=col[vpan[1]],fontface=2, size=4)
     ggsave(figname, p,width=15,height=9,units="cm")
-  #print (figname) ##### CAN BE REMOVED IF YOU DO NOT WANT THE GRAPH TO BE PLOTTED
     
    #return(p)
 
@@ -361,7 +366,7 @@ for (sp in glmtable[,1])
     if (!all(is.na(glmtable[glmtable[,1]==sp,4:(length(glmtable)-1)]))) ##ignore lines with only NA
     { 
         #p <- 
-        ggplot.glm(glmtable = glmtable, datatable=datatable,unitobs=unitobs, serie=NULL, sp=sp, description=TRUE, tendanceSurFigure=TRUE, seuilOccu=14, assessIC=TRUE)
+        ggplot.glm(glmtable = glmtable, datatable=datatable,unitobs=unitobs,metric=metric, sp=sp, description=TRUE, trendOnGraph=TRUE, assessIC=assessIC)
         #plots <- list(plots,p)
     }
 }

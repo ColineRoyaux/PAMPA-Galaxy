@@ -61,6 +61,11 @@ vars_data2 <- c("observation.unit",listFact,listRand)
 err_msg_data2<-"The input unitobs dataset doesn't have the right format. It needs to have at least the following 2 variables :\n- observation.unit (or year and site)\n- factors used in GLM (habitat, year and/or site)\n"
 check_file(tabUnitobs,err_msg_data2,vars_data2[vars_data2 != "None"],2)
 
+if (all(c(listFact,listRand)=="None")) {stop("GLM needs to have at least one response variable.")}
+
+if (listFact[1] == "None" || all(is.element(listFact,listRand))) {stop("GLM can't have only random effects.")} 
+
+
 ####################################################################################################
 ########## Computing Generalized Linear Model ## Function : modeleLineaireWP2.unitobs.f ############
 ####################################################################################################
