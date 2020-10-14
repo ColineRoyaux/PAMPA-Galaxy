@@ -123,12 +123,14 @@ The first input may be extracted from the 'Calculate community metrics' tool.
 A tabular file with unitobs or location data which contains at least as much columns as used response variables and separation factor in addition with the 'observation.unit' or 'location' column.
 
 +--------------------------------+---------+--------+------------+-----+       
-| observation.unit OR location   | ??site? |  year  |  habitat   | ... |            
+| observation.unit OR location   |   site  |  year  |  habitat   | ... |            
 +================================+=========+========+============+=====+        
 |  site_yearID     OR locationID | site ID |  2000  | habitatID  | ... |            
 +--------------------------------+---------+--------+------------+-----+        
 |              ...               |   ...   |   ...  |     ...    | ... |       
 +--------------------------------+---------+--------+------------+-----+ 
+
+The site may represent the same entity as the location or represent an aggregation of several locations
 
 |
 

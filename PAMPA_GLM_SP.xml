@@ -130,6 +130,8 @@ A tabular file with unitobs or location data which contains at least as much col
 |              ...               |      ...     |   ...   |   ...  |     ...    | ... |       
 +--------------------------------+--------------+---------+--------+------------+-----+ 
 
+The site may represent the same entity as the location or represent an aggregation of several locations.
+
 |
 
 **Output**
